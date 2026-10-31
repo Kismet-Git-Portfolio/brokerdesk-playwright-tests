@@ -3,7 +3,7 @@
 ![Playwright Tests](https://github.com/<your-username>/<repo-name>/actions/workflows/playwright.yml/badge.svg)
 <!-- Replace <your-username>/<repo-name> after pushing to GitHub -->
 
-A self-contained QA automation demo. It ships a tiny mock web app (Node + Express, in-memory data) with:
+**ShiftDesk QA Showcase**: a self-contained QA automation demo. It ships a polished mock web app (Node + Express, in-memory data, plain HTML/CSS/vanilla JS with no build step) with a QA Showcase home page, a Gig Platform area and a Trading Desk:
 
 - **Gig shifts:** login/logout, job and shift listing, shift creation with compensation (base + allowance + special = gross), job applications, payouts.
 - **Finance module:** trade booking (instrument, side, price, quantity), notional = price × quantity rounded to 2 decimals, a blotter with a buy/sell filter, and idempotent submits.
@@ -53,6 +53,13 @@ Optional: copy `.env.example` to `.env` (or export the variables) to override `B
 npm start                                   # terminal 1
 k6 run -e PROFILE=smoke k6/load-trades.js   # 1 user for 30s
 k6 run k6/load-trades.js                    # ramp to 20 users
+```
+
+## Demo media
+
+```bash
+npx playwright test -c playwright.media.config.ts      # slowed (slowMo 400) videos of key UI tests -> media-results/
+MEDIA_DIR=. npx playwright test -c scripts/screenshots.config.ts   # full-page screenshots
 ```
 
 New to the code? Read [HOW-IT-WORKS.md](HOW-IT-WORKS.md).

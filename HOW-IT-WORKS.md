@@ -3,7 +3,10 @@
 ## 1. Folder map
 
 ```
-app/server.js              The mock web app (Express). All pages + JSON APIs, data kept in memory.
+app/server.js              The mock web app (Express). JSON APIs on top, UI pages below, data kept in memory.
+app/public/styles.css      The ShiftDesk design system (navy/teal, cards, badges, skeletons, toasts).
+playwright.media.config.ts Records slowed-down videos of the key UI tests.
+scripts/                   Screenshot script for demo media.
 playwright.config.ts       Playwright settings: where tests live, base URL, reporters, webServer.
 pages/                     Page objects: one class per screen (LoginPage, JobsPage, ShiftPage,
                            JobDetailPage, PayoutsPage, TradesPage).
@@ -22,6 +25,8 @@ k6/load-trades.js          K6 load script (run by hand, not in CI).
 `playwright.config.ts` has a `webServer` block. Before any test runs, Playwright runs `node app/server.js`, then polls `http://localhost:3100/health` until it answers. When the tests finish it stops the server. Locally, if the app is already running (`npm start`), it reuses it (`reuseExistingServer`); in CI it always starts a fresh one.
 
 Because data lives in memory, the config uses `workers: 1`, and the `api` fixture calls `POST /api/reset` before each test so every test starts clean.
+
+Pages: `/` QA Showcase home (coverage table), `/jobs`, `/jobs/:id`, `/shifts/new`, `/payouts`, `/payouts/:id` (PDF-style statement), `/trades`. The buy/sell toggle and filter chips stay in sync with the plain `<select>` elements the tests use, so UI polish never changes test behaviour.
 
 ## 3. Page objects
 
