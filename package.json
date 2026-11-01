@@ -1,14 +1,15 @@
 {
-  "name": "playwright-gig-shifts-demo",
+  "name": "brokerdesk-qa-showcase",
   "version": "1.0.0",
   "private": true,
-  "description": "Playwright + TypeScript demo suite against a self-contained mock gig-shifts and trade-booking app",
+  "description": "Playwright + TypeScript QA showcase against a self-contained mock interdealer-broker trading desk (price board, RFQ ticket, trade lifecycle, FIX 4.4 log, SQL data checks)",
   "scripts": {
     "start": "node app/server.js",
     "test": "playwright test",
     "test:ui": "playwright test --ui",
     "report": "playwright show-report",
-    "k6": "k6 run k6/load-trades.js"
+    "k6": "k6 run k6/load-trades.js",
+    "demo:video": "playwright test -c scripts/broker-demo.config.ts"
   },
   "dependencies": {
     "better-sqlite3": "^13.0.3",
@@ -18,5 +19,8 @@
     "@playwright/test": "^1.48.0",
     "@types/node": "^20.0.0",
     "typescript": "^5.4.0"
+  },
+  "engines": {
+    "node": ">=22"
   }
 }

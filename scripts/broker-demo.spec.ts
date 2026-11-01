@@ -1,0 +1,74 @@
+// The 2-minute interview demo, recorded in slow motion with screenshots (MEDIA_DIR=... to choose the output folder).
+import { test } from '@playwright/test';
+const OUT = process.env.MEDIA_DIR || 'media-results';
+const shot = (page: any, name: string) => page.screenshot({ path: `${OUT}/broker-${name}.png`, fullPage: true });
+test('broker demo', async ({ page, request }) => {
+  await request.post('/api/reset?seed=demo');
+  await page.goto('/login');
+  await shot(page, '00-login');
+  await page.getByTestId('login-email').fill(process.env.DEMO_USER || 'demo.user@example.com');
+  await page.getByTestId('login-password').fill(process.env.DEMO_PASSWORD || 'Demo#Pass123');
+  await page.getByTestId('login-submit').click();
+  await page.waitForURL(/\/$/);
+  await page.getByTestId('class-row').first().waitFor();
+  await page.waitForTimeout(1500);
+  await shot(page, '01-overview');
+  await page.goto('/prices');
+  await page.getByTestId('price-row').first().waitFor();
+  await page.waitForTimeout(2500);
+  await shot(page, '02-price-board');
+  await page.locator('[data-testid="price-row"][data-symbol="BRENT"] [data-testid="price-freeze"]').click();
+  await page.locator('[data-testid="price-row"][data-symbol="BRENT"] [data-testid="price-status"]').filter({ hasText: 'STALE' }).waitFor();
+  await page.waitForTimeout(2000);
+  await shot(page, '03-stale-price');
+  await page.goto('/trades');
+  await page.locator('[data-inst="EURUSD"]').click();
+  await page.getByTestId('use-ask').waitFor();
+  await page.getByTestId('trade-quantity').pressSequentially('5000000', { delay: 40 });
+  await page.getByTestId('use-ask').click();
+  await page.getByTestId('trade-client').selectOption('Bravo Bank');
+  await page.getByTestId('trade-counterparty').selectOption('EASTSEC');
+  await page.waitForTimeout(800);
+  await shot(page, '04-order-ticket');
+  await page.getByTestId('trade-submit').dblclick(); // double click on purpose: still one trade
+  await page.getByTestId('confirm-trade-id').waitFor();
+  await page.waitForTimeout(1500);
+  await shot(page, '05-order-confirmed');
+  const id = (await page.getByTestId('confirm-trade-id').textContent())!.trim();
+  // fat finger
+  await page.getByTestId('trade-price').fill('1.2000');
+  await page.getByTestId('trade-submit').click();
+  await page.getByTestId('trade-error').filter({ hasText: 'tolerance' }).waitFor();
+  await page.waitForTimeout(1500);
+  await shot(page, '06-tolerance-reject');
+  await page.getByTestId('confirm-fix').click();
+  await page.locator('[data-testid="fix-row"][data-type="D"]').click();
+  await page.waitForTimeout(1500);
+  await shot(page, '07-fix-log');
+  await page.goto(`/trades/${id}`);
+  await page.getByTestId('audit-row').first().waitFor();
+  await page.getByTestId('action-confirm').click();
+  await page.getByTestId('trade-status').filter({ hasText: 'CONFIRMED' }).waitFor();
+  await page.getByTestId('action-settle').click();
+  await page.getByTestId('trade-status').filter({ hasText: 'SETTLED' }).waitFor();
+  await page.waitForTimeout(1500);
+  await shot(page, '08-lifecycle');
+  await page.goto('/blotter');
+  await page.getByTestId('trade-row').first().waitFor();
+  await page.getByTestId('blotter-asset').selectOption('FX');
+  await page.waitForTimeout(1200);
+  await shot(page, '09-blotter');
+  await page.goto('/data-checks');
+  for (const [k, n] of [['missing', 10], ['dupes', 11], ['recon', 12], ['fix', 13], ['tolerance', 14]] as const) {
+    await page.getByTestId(`preset-${k}`).click();
+    await page.getByTestId('sql-meta').filter({ hasText: 'row(s)' }).waitFor();
+    await page.waitForTimeout(1800);
+    await shot(page, `${n}-sql-${k}`);
+  }
+  await page.getByTestId('sql-editor').fill('');
+  await page.getByTestId('sql-editor').pressSequentially('DELETE FROM trades;', { delay: 60 });
+  await page.getByTestId('sql-run').click();
+  await page.getByTestId('sql-error').filter({ hasText: 'Only SELECT' }).waitFor();
+  await page.waitForTimeout(1800);
+  await shot(page, '15-sql-blocked');
+});

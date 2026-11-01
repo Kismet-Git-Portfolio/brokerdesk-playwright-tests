@@ -11,6 +11,6 @@ test.describe('SQL endpoint', () => {
     await api.post('/api/login', { data: { username: creds.user, password: creds.password } });
     const t = await (await api.post('/api/trades', { data: { instrument: 'gbpusd', side: 'buy', price: 1.2734, quantity: 1000 } })).json();
     const r = await api.post('/api/sql', { data: { query: `SELECT instrument, notional, status FROM trades WHERE trade_id = '${t.id}'` } });
-    expect((await r.json()).rows).toEqual([['GBPUSD', 1273.4, 'LIVE']]);
+    expect((await r.json()).rows).toEqual([['GBPUSD', 1273.4, 'NEW']]);
   });
 });

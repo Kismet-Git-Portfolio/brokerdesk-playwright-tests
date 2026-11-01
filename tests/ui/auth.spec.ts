@@ -2,12 +2,12 @@ import { test, expect } from '../../fixtures/test';
 import { creds } from '../../fixtures/env';
 
 test.describe('Auth', () => {
-  test('valid login lands on jobs', async ({ api, loginPage, page }) => {
+  test('valid login lands on the trading overview', async ({ api, loginPage, page }) => {
     void api;
     await loginPage.goto();
     await loginPage.login(creds.user, creds.password);
-    await expect(page).toHaveURL(/\/jobs$/);
-    await expect(page.getByRole('heading', { name: 'Jobs and shifts' })).toBeVisible();
+    await expect(page).toHaveURL(/\/$/);
+    await expect(page.getByRole('heading', { name: 'Overview' })).toBeVisible();
   });
 
   test('invalid password shows an error and stays on login', async ({ loginPage, page }) => {

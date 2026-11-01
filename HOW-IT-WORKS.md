@@ -1,87 +1,83 @@
 # How it works (beginner walkthrough)
 
-## 1. Folder map
+## 1. The story
+
+BrokerDesk is a pretend interdealer broker. Clients ask for prices (an RFQ), a broker books the trade by voice or on screen, the counterparty confirms, and then the trade settles, or fails and has to be chased. Every step leaves a record: a row in `trades`, FIX messages in `fix_messages`, a row in `settlements`, and lines in `audit`. QA's job is to prove those records agree with each other and with the screen.
+
+## 2. Folder map
 
 ```
-app/server.js              The mock web app (Express). JSON APIs on top, UI pages below, data kept in memory.
-app/public/styles.css      The ShiftDesk design system (navy/teal, cards, badges, skeletons, toasts).
-playwright.media.config.ts Records slowed-down videos of the key UI tests.
-scripts/                   Screenshot script for demo media.
-playwright.config.ts       Playwright settings: where tests live, base URL, reporters, webServer.
-pages/                     Page objects: one class per screen (LoginPage, JobsPage, ShiftPage,
-                           JobDetailPage, PayoutsPage, TradesPage).
-fixtures/test.ts           Custom fixtures: `api`, `loggedIn`, and the page objects.
-fixtures/env.ts            Reads credentials from env vars (with demo defaults).
-fixtures/data.ts           Random, unique test data helpers.
-tests/ui/                  Browser tests (they click and type like a user).
-tests/api/                 API tests (they call the JSON endpoints directly, no browser).
-k6/load-trades.js          K6 load script (run by hand, not in CI).
-.github/workflows/         GitHub Actions CI.
-.env.example               Example environment variables.
+app/server.js              The whole mock app: APIs, market data simulator, FIX builder, lifecycle rules, SQLite, HTML pages.
+app/public/*.js            Page scripts: overview, prices, ticket, blotter, trade (detail), fix (log viewer).
+app/public/styles.css      Dark/teal design system with the moving background blobs.
+sql/presets.js             Queries behind the Data checks buttons (sql/data-checks.sql has the same with comments).
+pages/                     Page objects, one per screen.
+fixtures/                  Custom fixtures (api, loggedIn, page objects), env credentials, random data.
+tests/ui, tests/api        Browser tests and API tests.
+scripts/                   Demo video + screenshot scripts.
+.github/workflows/         CI.
 ```
 
-## 2. How the app starts by itself
+## 3. Market data (price board)
 
-`playwright.config.ts` has a `webServer` block. Before any test runs, Playwright runs `node app/server.js`, then polls `http://localhost:3100/health` until it answers. When the tests finish it stops the server. Locally, if the app is already running (`npm start`), it reuses it (`reuseExistingServer`); in CI it always starts a fresh one.
+`INSTRUMENTS` in `server.js` lists 8 instruments with a reference price, a tolerance band (%), decimals and a spread. `quote(symbol)` moves the mid price at most once a second, a small bounded wobble around the reference, and returns bid, ask, timestamp and `stale` (older than 5 seconds).
 
-Because data lives in memory, the config uses `workers: 1`, and the `api` fixture calls `POST /api/reset` before each test so every test starts clean.
+`POST /api/prices/:symbol/freeze` simulates a feed outage: the price stops moving and its timestamp is pushed into the past, so it reads STALE straight away. `/resume` brings it back. The *Simulate outage* button and the tests use the same hook.
 
-Pages: `/` QA Showcase home (coverage table), `/jobs`, `/jobs/:id`, `/shifts/new`, `/payouts`, `/payouts/:id` (PDF-style statement), `/trades`. The buy/sell toggle and filter chips stay in sync with the plain `<select>` elements the tests use, so UI polish never changes test behaviour.
+## 4. Order ticket and validation
 
-## 3. Page objects
+`POST /api/orders` (the ticket) runs `validateOrder` in this order: instrument, side, price > 0, quantity > 0, known instrument, client, counterparty, then the **market checks**: the price must not be stale, and it must be within ± tolerance % of the current mid. Failures are saved in `rejects`, which feeds the Overview KPI.
 
-A page object hides the "how" (locators) behind readable methods. For example `TradesPage.fill({...})` fills four fields, so the test just says what it wants:
+`POST /api/trades` is a quicker booking endpoint (client/counterparty optional). The older tests and the K6 script use it, and it applies the same market checks to known instruments.
 
-```ts
-await tradesPage.fill({ instrument: 'EURUSD', side: 'buy', price: '1.08', quantity: '100' });
-await tradesPage.submit().click();
-```
+**Idempotency:** the ticket sends an `Idempotency-Key` header and disables the button while a request is in flight. If the same key arrives twice, the server returns the first result (200, `duplicate: true`) instead of booking again.
 
-If a field changes, you fix it in one place. Locators use `getByTestId(...)`, which reads the `data-testid` attribute (set in the config with `testIdAttribute`). Test IDs don't break when styling or text changes, unlike CSS classes or `nth()`.
+## 5. Trade lifecycle
 
-## 4. Fixtures
+`TRANSITIONS` is the rulebook:
 
-Fixtures are things a test asks for by name in its arguments. In `fixtures/test.ts`:
+| Action | Allowed from | Goes to | FIX sent |
+|---|---|---|---|
+| book | – | NEW | 35=D, 35=8 150=0 39=0 |
+| confirm | NEW | CONFIRMED | 35=8 150=F 39=2 (fill) |
+| settle | CONFIRMED, FAILED | SETTLED | – (settlement row) |
+| fail | CONFIRMED | FAILED | – (settlement row FAILED) |
+| cancel | NEW, CONFIRMED | CANCELLED | 35=F, 35=8 150=4 39=4 |
+| amend | NEW only | NEW | 35=G, 35=8 150=5 |
 
-- `api`: Playwright's request client. Before handing it over, it resets the store.
-- `loggedIn`: depends on `api` and `loginPage`; it signs in through the UI and checks we landed on `/jobs`.
-- `loginPage`, `tradesPage`, etc.: ready-made page objects.
+Anything else returns **409** and changes nothing. Every change writes an `audit` row.
 
-So `test('x', async ({ loggedIn, tradesPage }) => ...)` means: reset data, log in, give me the trades page object.
+## 6. FIX messages
 
-## 5. Env vars
+`buildFix` writes real FIX 4.4 layout: `8=FIX.4.4`, then `9=` BodyLength (bytes from tag 35 up to the checksum), then the fields, then `10=` CheckSum (sum of all bytes mod 256, three digits). The separator is the SOH character; the UI shows it as `|`.
 
-`fixtures/env.ts` reads `DEMO_USER` and `DEMO_PASSWORD`, and the server reads the same ones, so they always match. Defaults are fake demo values. In a real project you would put real secrets in CI secrets, never in code. `BASE_URL` and `PORT` change where the app runs.
+Key tags: 11 ClOrdID, 55 Symbol, 54 Side (1 buy, 2 sell), 38 OrderQty, 44 Price, 37 OrderID, 150 ExecType, 39 OrdStatus, 14 CumQty, 151 LeavesQty. `tests/api/fix.api.spec.ts` recomputes BodyLength and CheckSum itself, so a broken encoder fails the test.
 
-## 6. How each test works
+## 7. Fixtures and page objects
 
-- **auth**: logs in with good credentials (lands on Jobs), bad password (error text, stays on /login), logout (back to /login, and /jobs now redirects).
-- **shifts**: types base 750 + allowance 120.50 + special 49.25, checks the on-screen gross says 919.75, publishes, checks the toast, then asks the API and checks it saved 919.75 too, then finds that row in the listing. A second test checks negative pay is rejected.
-- **jobs listing**: the two seeded jobs are shown.
-- **job application**: opens a job, applies, sees "Application sent!" and count 1; applying again with the same email shows "Already applied".
-- **batch of 10**: creates 10 applicants through the API (fast setup, no clicking), then opens the job page and checks all 10 emails are visible. This is the "10 applicants in one run" time-saver.
-- **slow network**: `page.route('**/api/jobs', ...)` waits 2 s before letting the request through. The test checks the "Loading..." text shows and the table is hidden, then waits (auto-waiting, no `waitForTimeout`) for the rows.
-- **payouts (double-payout check)**: creates a payout of 1500 + 250.75 + 99.99 through the API, checks the API amount is exactly 1850.74 (and not double), then checks the Payouts page shows "1850.74". Three sources must agree: expected, API, UI.
-- **trades UI**: six validation cases (negative, zero, text for price and for quantity) each show an error and create nothing; a `dblclick()` on Book creates exactly one trade (the button disables itself and the server also dedupes by Idempotency-Key); a booked trade's blotter row matches the API's values, including notional 99.875 × 3 = 299.63; the filter shows only sells, then only buys.
-- **API tests**: same rules without a browser: validation returns 400, notional math with tricky decimals (0.1 × 0.2 = 0.02, 1.005 × 1000 = 1005), two parallel requests with the same Idempotency-Key create one record, and `?side=sell` filters.
+- `api`: resets the DB (empty) before each test. Tests that need the seeded desk call `POST /api/reset?seed=demo`.
+- `loggedIn`: signs in through the UI and checks we land on the Overview (`/`).
+- `tradesPage.fill({...})` fills the ticket. Client and counterparty default to demo values; pass `''` to test the "required" errors.
+- `fixLog.value(55)` reads a parsed tag's value; `tradeDetail.action('confirm')` gets a lifecycle button.
 
-## 7. How CI works
+Locators use `getByTestId`, so styling changes never break tests. There are no fixed sleeps in the test suite except one 2-second wait that proves a stale price *doesn't* tick.
 
-`.github/workflows/playwright.yml` runs on every push and pull request. On a fresh Ubuntu machine it checks out the code, installs Node 20, runs `npm ci`, installs Chromium, runs `npx playwright test` (the webServer starts the app), and uploads `playwright-report/` as an artifact, even when tests fail. With `CI` set, the config retries a failing test once and records a trace on that retry, so you can see exactly what happened.
+## 8. SQL data checks
 
-## 8. Try this (tinkering exercises)
+`POST /api/sql` needs a session and runs exactly one read-only statement (`runReadOnly` uses better-sqlite3's `stmt.readonly`). Seeded breaks and the check that finds each one are listed in the README. Try:
 
-1. **Break the math on purpose.** In `app/server.js`, change payout `amount` to `round2((base + allowance + special) * 2)`. Run `npx playwright test payouts` and watch the double-payout test catch it. Undo the change.
-2. **Remove the double-click guard.** In the `/trades` page script, delete `if(btn.disabled)return;btn.disabled=true;` and the Idempotency-Key header. Does the double-click test fail? Put it back.
-3. **Make the network slower.** Change the 2000 ms delay in the slow-network test to 8000 and see it still pass with no extra sleeps. Then try 15000 and read the timeout error.
-4. **Add a validation rule.** Make the server reject quantities above 1,000,000, then add a UI test and an API test for it.
-5. **Debug visually.** Run `npx playwright test --ui` or `npx playwright test --headed --debug tests/ui/trades.spec.ts`, step through a test, and open a trace from the HTML report.
+- `SELECT * FROM settlements WHERE status = NULL` vs `... IS NULL`: the first returns nothing because NULL never equals anything.
+- `SELECT msg_type, COUNT(*) FROM fix_messages GROUP BY msg_type`.
+- `SELECT * FROM audit WHERE trade_id = 'T-1005'`.
 
-## 9. SQL data checks
+## 9. Try this (break it on purpose)
 
-- `app/server.js` creates an in-memory SQLite DB on start (`reset()` → `SCHEMA` → `seedDemo()`). `/api/trades` and `/api/payouts` read from and write to it, so the UI, API and DB always share one source of truth.
-- `POST /api/sql` is the read-only runner (`runReadOnly`). It rejects anything that isn't a single `SELECT`/`WITH` statement, and it relies on better-sqlite3's `stmt.readonly` flag instead of a fragile keyword list.
-- `sql/presets.js` holds the queries behind the preset buttons. `sql/data-checks.sql` has the same queries with comments telling each ticket story.
-- `pages/DataChecksPage.ts` is the page object. `table()` returns the result grid as arrays, so tests can do `expect(rows).toEqual([...])`.
-- Try this: in the console, run `SELECT * FROM settlements WHERE status = NULL` and then `... IS NULL`. The first returns 0 rows because NULL never equals anything.
-- Media: `npx playwright test -c scripts/sql-demo.config.ts` records the slow-mo walkthrough (set `MEDIA_DIR` for the screenshots).
+1. **Remove idempotency:** in `app/public/ticket.js` delete `if (btn.disabled) return; btn.disabled = true;` and the `key` argument to `post`. Run `npx playwright test order-ticket`. The double-click test catches it.
+2. **Widen the tolerance:** set BRENT's tolerance to 20 in `INSTRUMENTS`. The fat-finger test fails.
+3. **Break FIX:** in `sendFix`, swap the side mapping (`'1'` for sell). The FIX tests fail on tag 54.
+4. **Allow an illegal move:** add `'NEW'` to the `settle` row of `TRANSITIONS`. The lifecycle API test catches it.
+5. **Debug visually:** `npx playwright test --ui`, or `npx playwright test --headed --debug tests/ui/fix-log.spec.ts`.
+
+## 10. CI
+
+On every push and PR, GitHub Actions installs Node 22, runs `npm ci`, installs Chromium, runs the suite and uploads the HTML report. With `CI` set, a failing test retries once and records a trace.

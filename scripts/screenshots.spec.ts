@@ -11,7 +11,7 @@ test('capture screenshots', async ({ page, request }) => {
   await page.getByTestId('login-email').fill(process.env.DEMO_USER || 'demo.user@example.com');
   await page.getByTestId('login-password').fill(process.env.DEMO_PASSWORD || 'Demo#Pass123');
   await page.getByTestId('login-submit').click();
-  await page.waitForURL(/\/jobs$/);
+  await page.waitForURL(/\/$/);
   await page.goto('/');
   await page.screenshot({ path: `${OUT}/v2-showcase-home.png`, fullPage: true });
   await page.goto('/payouts');

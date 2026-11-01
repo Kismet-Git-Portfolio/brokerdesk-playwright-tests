@@ -71,3 +71,28 @@ html{background:var(--bg)}
 .sqled:focus{outline:2px solid var(--teal)}
 td.null{color:#fbbf24;font-style:italic;font-family:ui-monospace,Menlo,monospace}
 .schema{display:grid;gap:.5rem;font-size:.85rem;color:var(--muted)}.defects{padding-left:1.1rem;line-height:1.7}
+/* BrokerDesk additions */
+.small{font-size:.78rem}.kpi{text-decoration:none;color:var(--text);transition:.15s}.kpi:hover{border-color:var(--teal)}
+.stat .value.warn{color:#fbbf24}.stat .value.bad{color:#fca5a5}
+.bars{display:grid;gap:.55rem}.bar{display:grid;grid-template-columns:140px 1fr 150px;gap:.6rem;align-items:center;font-size:.88rem}
+.bt{height:10px;background:var(--panel2);border-radius:99px;overflow:hidden}.bt span{display:block;height:100%;background:linear-gradient(90deg,var(--teal),#3b82f6);border-radius:99px}
+.bv{text-align:right;font-variant-numeric:tabular-nums}
+.ticker{display:grid;grid-template-columns:repeat(2,1fr);gap:.5rem}.tk{display:flex;justify-content:space-between;gap:.5rem;background:var(--panel2);padding:.45rem .7rem;border-radius:10px;font-size:.85rem;align-items:center}
+.tk.stale{outline:1px solid rgba(239,68,68,.6)}.num{font-variant-numeric:tabular-nums}
+tr.up td.px{color:#86efac;transition:color .3s}tr.down td.px{color:#fca5a5;transition:color .3s}tr.stale td{opacity:.7}tr.stale td:nth-child(7),tr.stale td:last-child{opacity:1}
+.mkt{background:#0a1530;border:1px solid var(--line);border-radius:12px;padding:.7rem .8rem;margin-bottom:.8rem;font-size:.88rem}
+.q{border:1px solid var(--line);background:transparent;color:var(--text);border-radius:8px;padding:.35rem .6rem;cursor:pointer;font:inherit;font-variant-numeric:tabular-nums;font-weight:700}
+.q.bid{color:#fca5a5}.q.ask{color:#86efac}.q:hover{border-color:var(--teal)}
+.confirm{margin-top:.9rem;background:rgba(34,197,94,.08);border:1px solid rgba(34,197,94,.35);border-radius:12px;padding:.8rem}
+.kv{display:grid;grid-template-columns:auto 1fr;gap:.35rem .9rem;margin-top:.5rem}.kv>span:nth-child(odd){color:var(--muted)}
+.badge.st-NEW{background:rgba(59,130,246,.18);color:#93c5fd}.badge.st-CONFIRMED{background:rgba(20,184,166,.18);color:#5eead4}.badge.st-SETTLED{background:rgba(34,197,94,.18);color:#86efac}
+.badge.st-FAILED{background:rgba(245,158,11,.2);color:#fcd34d}.badge.st-CANCELLED{background:rgba(239,68,68,.18);color:#fca5a5}
+.stepper{display:flex;align-items:center;gap:.4rem;flex-wrap:wrap}.step{padding:.3rem .7rem;border-radius:99px;border:1px solid var(--line);font-size:.78rem;font-weight:700;color:var(--muted)}
+.step.done{color:var(--teal);border-color:rgba(20,184,166,.5)}.step.cur{color:var(--text);border-color:var(--teal);background:rgba(20,184,166,.15)}.arrow{color:var(--muted)}
+.btn.danger{background:#ef4444;color:#fff}.btn.danger:hover{background:#f87171}
+ol.audit{margin:0;padding-left:1.1rem;display:grid;gap:.5rem}
+.fixlist{display:grid;gap:.5rem}.fixmsg{background:#0a1530;border:1px solid var(--line);border-radius:10px;padding:.5rem .6rem;display:grid;gap:.3rem}
+.fixmsg code,.raw{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:.75rem;color:#a7f3d0;word-break:break-all;white-space:pre-wrap}
+.raw{background:#0a1530;border:1px solid var(--line);border-radius:10px;padding:.7rem;margin:0 0 .8rem}
+tr.clickable{cursor:pointer}tr.sel td{background:rgba(20,184,166,.12)}.sticky{position:sticky;top:1rem}
+td .kbd,td a.kbd{white-space:nowrap}
