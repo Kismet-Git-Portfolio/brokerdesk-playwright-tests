@@ -152,7 +152,7 @@ app.get('/login', (_req, res) => res.send(`${head('Sign in')}<body class="login"
 <label class="f">Email <input data-testid="login-email" name="username" autocomplete="username" placeholder="demo.user@example.com"></label>
 <label class="f">Password <input data-testid="login-password" type="password" name="password" autocomplete="current-password"></label>
 <button class="btn" data-testid="login-submit" type="submit">Sign in</button><p class="error" data-testid="login-error"></p></form>
-<p class="sub" style="font-size:.8rem">Demo credentials come from env vars (see <span class="kbd">.env.example</span>).</p></div>
+</div><footer class="credit">Designed by <strong>Keesmet Gorostiza</strong> to showcase automation testing<br>with Playwright + TypeScript.</footer>
 <script>async function login(){const r=await fetch('/api/login',{method:'POST',headers:{'Content-Type':'application/json'},
 body:JSON.stringify({username:document.querySelector('[name=username]').value,password:document.querySelector('[name=password]').value})});
 if(r.ok)location='/jobs';else document.querySelector('[data-testid=login-error]').textContent=(await r.json()).error;}</script></body></html>`));
