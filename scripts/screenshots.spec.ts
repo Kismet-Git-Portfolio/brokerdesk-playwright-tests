@@ -13,7 +13,7 @@ test('capture screenshots', async ({ page, request }) => {
   await page.getByTestId('login-submit').click();
   await page.waitForURL(/\/$/);
   await page.goto('/');
-  await page.screenshot({ path: `${OUT}/v2-showcase-home.png`, fullPage: true });
+  await page.screenshot({ path: `${OUT}/v2-home.png`, fullPage: true });
   await page.goto('/payouts');
   await page.getByTestId('payout-row').first().waitFor();
   await page.screenshot({ path: `${OUT}/v2-payouts.png`, fullPage: true });

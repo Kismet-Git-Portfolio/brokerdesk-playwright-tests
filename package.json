@@ -1,8 +1,8 @@
 {
-  "name": "brokerdesk-qa-showcase",
+  "name": "brokerdesk-playwright-tests",
   "version": "1.0.0",
   "private": true,
-  "description": "Playwright + TypeScript QA showcase against a self-contained mock interdealer-broker trading desk (price board, RFQ ticket, trade lifecycle, FIX 4.4 log, SQL data checks)",
+  "description": "Playwright tests for a mock broker trading desk",
   "scripts": {
     "start": "node app/server.js",
     "test": "playwright test",
