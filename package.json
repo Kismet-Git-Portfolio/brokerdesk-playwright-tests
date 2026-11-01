@@ -10,6 +10,13 @@
     "report": "playwright show-report",
     "k6": "k6 run k6/load-trades.js"
   },
-  "dependencies": { "express": "^4.19.2" },
-  "devDependencies": { "@playwright/test": "^1.48.0", "@types/node": "^20.0.0", "typescript": "^5.4.0" }
+  "dependencies": {
+    "better-sqlite3": "^11.10.0",
+    "express": "^4.19.2"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.48.0",
+    "@types/node": "^20.0.0",
+    "typescript": "^5.4.0"
+  }
 }

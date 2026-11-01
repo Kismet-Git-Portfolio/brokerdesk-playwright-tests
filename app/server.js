@@ -1,6 +1,8 @@
-// Tiny self-contained mock "gig shifts" + trade booking app. In-memory only. Demo data, no real systems.
+// Tiny self-contained mock "gig shifts" + trade booking app. Demo data only, no real systems.
+// Trades, settlements and payouts live in an in-memory SQLite DB (better-sqlite3) so QA can verify them with SQL.
 const express = require('express');
 const crypto = require('crypto');
+const Database = require('better-sqlite3');
 
 const PORT = Number(process.env.PORT || 3100);
 const USER = process.env.DEMO_USER || 'demo.user@example.com';
@@ -13,21 +15,58 @@ const round2 = (n) => Math.round((n + Number.EPSILON) * 100) / 100;
 const id = () => crypto.randomUUID().slice(0, 8);
 
 let db;
-function reset() {
-  db = {
-    sessions: new Set(),
-    jobs: [
-      { id: 'job-1', title: 'Warehouse Picker', location: 'Makati', type: 'job' },
-      { id: 'job-2', title: 'Event Staff', location: 'Taguig', type: 'job' },
-    ],
-    shifts: [],
-    applicants: {},  // jobId -> [{name,email}]
-    payouts: [],
-    trades: [],
-    idem: {},        // idempotency key -> stored response
-  };
+// ---------- SQLite ----------
+const SCHEMA = `
+CREATE TABLE trades (trade_id TEXT PRIMARY KEY, instrument TEXT NOT NULL, side TEXT NOT NULL CHECK (side IN ('buy','sell')),
+  price REAL NOT NULL, quantity REAL NOT NULL, notional REAL NOT NULL, client TEXT, status TEXT NOT NULL DEFAULT 'LIVE', seq INTEGER);
+CREATE TABLE settlements (settlement_id TEXT PRIMARY KEY, trade_id TEXT NOT NULL, status TEXT NOT NULL, settled_on TEXT);
+CREATE TABLE payouts (payout_id TEXT PRIMARY KEY, worker TEXT NOT NULL, shift_ref TEXT, base REAL NOT NULL, allowance REAL NOT NULL,
+  special REAL NOT NULL, amount REAL NOT NULL, seq INTEGER);
+CREATE INDEX idx_settlements_trade ON settlements(trade_id);`;
+let sql, seq = 0;
+// Demo data with deliberate defects for the Data Checks page (QA-318, QA-322, QA-327).
+function seedDemo() {
+  const t = sql.prepare('INSERT INTO trades (trade_id,instrument,side,price,quantity,notional,client,status,seq) VALUES (?,?,?,?,?,?,?,?,?)');
+  [['T-1001', 'GBPUSD', 'buy', 1.2734, 250000, 'Alpha', 'LIVE'], ['T-1002', 'EURUSD', 'sell', 1.0842, 500000, 'Bravo', 'LIVE'],
+   ['T-1003', 'UST10Y', 'buy', 99.875, 30, 'Alpha', 'LIVE'], ['T-1004', 'USDJPY', 'sell', 151.23, 100000, 'Charlie', 'LIVE'],
+   ['T-1005', 'XAUUSD', 'buy', 2384.4, 12, 'Bravo', 'LIVE'], ['T-1006', 'BUND10Y', 'sell', 131.62, 40, 'Delta', 'LIVE'],
+   ['T-1007', 'EURUSD', 'buy', 1.0839, 200000, 'Echo', 'CANCELLED']] // cancelled: in DB, hidden from blotter (QA-327)
+    .forEach(([id, i, sd, p, q, c, st]) => t.run(id, i, sd, p, q, round2(p * q), c, st, ++seq));
+  const s = sql.prepare('INSERT INTO settlements VALUES (?,?,?,?)');
+  [['S-501', 'T-1001', 'SETTLED', '2026-10-28'], ['S-502', 'T-1002', 'SETTLED', '2026-10-28'], ['S-503', 'T-1003', 'SETTLED', '2026-10-29'],
+   ['S-505', 'T-1005', 'FAILED', null], ['S-507', 'T-1007', 'SETTLED', '2026-10-29']] // T-1004 + T-1006 have none (QA-318)
+    .forEach((r) => s.run(...r));
+  const p = sql.prepare('INSERT INTO payouts VALUES (?,?,?,?,?,?,?,?)');
+  [['P-9001', 'Ana Reyes', 'shift-A1', 1500, 250.75, 99.99], ['P-9002', 'Ben Cruz', 'shift-B7', 980, 120, 0],
+   ['P-9003', 'Carla Santos', 'shift-C3', 2100.5, 300, 150.25], ['P-9004', 'Ben Cruz', 'shift-B7', 980, 120, 0]] // duplicate (QA-322)
+    .forEach(([id, w, r, b, a, sp]) => p.run(id, w, r, b, a, sp, round2(b + a + sp), ++seq));
 }
-reset();
+function reset(seed = false) {
+  db = { sessions: db ? db.sessions : new Set(), jobs: [
+      { id: 'job-1', title: 'Warehouse Picker', location: 'Makati', type: 'job' },
+      { id: 'job-2', title: 'Event Staff', location: 'Taguig', type: 'job' }], shifts: [], applicants: {}, idem: {} };
+  if (sql) sql.close();
+  sql = new Database(':memory:');
+  sql.exec(SCHEMA);
+  if (seed) seedDemo();
+}
+reset(process.env.SEED !== '0'); // the app starts with demo data; tests reset to an empty DB (or ?seed=demo)
+const TRADE_COLS = 'trade_id AS id, instrument, side, price, quantity, notional';
+const PAYOUT_COLS = 'payout_id AS id, worker, base, allowance, special, amount';
+
+// Read-only SQL runner for the Data Checks page: one SELECT/WITH statement, no writes, row cap.
+function runReadOnly(query) {
+  const q = String(query || '').trim().replace(/;\s*$/, '');
+  if (!q) return { error: 'Query is empty' };
+  if (!/^(select|with)\b/i.test(q)) return { error: 'Only SELECT queries are allowed (read-only console)' };
+  let stmt;
+  try { stmt = sql.prepare(q); } catch (e) { return { error: /more than one statement/i.test(e.message) ? 'Only one statement is allowed' : 'SQL error: ' + e.message }; }
+  if (!stmt.readonly || !stmt.reader) return { error: 'Only SELECT queries are allowed (read-only console)' };
+  try {
+    const rows = stmt.raw(true).all().slice(0, 500);
+    return { columns: stmt.columns().map((c) => c.name), rows };
+  } catch (e) { return { error: 'SQL error: ' + e.message }; }
+}
 
 // ---------- helpers ----------
 const num = (v) => (typeof v === 'number' ? v : typeof v === 'string' && v.trim() !== '' ? Number(v) : NaN);
@@ -47,7 +86,12 @@ function idempotent(req, res, create) {
 
 // ---------- API ----------
 app.get('/health', (_req, res) => res.json({ ok: true }));
-app.post('/api/reset', (_req, res) => { reset(); res.json({ ok: true }); });
+app.post('/api/reset', (req, res) => { reset(req.query.seed === 'demo' || (req.body || {}).seed === 'demo'); res.json({ ok: true }); });
+app.post('/api/sql', (req, res) => {
+  if (!authed(req)) return res.status(401).json({ error: 'Sign in required' });
+  const r = runReadOnly((req.body || {}).query);
+  res.status(r.error ? 400 : 200).json(r);
+});
 
 app.post('/api/login', (req, res) => {
   const { username, password } = req.body || {};
@@ -86,7 +130,7 @@ app.post('/api/jobs/:id/apply', (req, res) => {
 });
 app.get('/api/jobs/:id/applicants', (req, res) => res.json(db.applicants[req.params.id] || []));
 
-app.get('/api/payouts', (_req, res) => res.json(db.payouts));
+app.get('/api/payouts', (_req, res) => res.json(sql.prepare(`SELECT ${PAYOUT_COLS} FROM payouts ORDER BY seq`).all()));
 app.post('/api/payouts', (req, res) =>
   idempotent(req, res, () => {
     const { worker } = req.body || {};
@@ -95,14 +139,16 @@ app.post('/api/payouts', (req, res) =>
       return { error: 'Invalid payout' };
     // payout = sum of components (a double-payout bug would show up here as 2x)
     const p = { id: 'pay-' + id(), worker, base, allowance, special, amount: round2(base + allowance + special) };
-    db.payouts.push(p);
+    sql.prepare('INSERT INTO payouts VALUES (?,?,?,?,?,?,?,?)').run(p.id, worker, req.body.shift_ref || null, base, allowance, special, p.amount, ++seq);
     return p;
   })
 );
 
 app.get('/api/trades', (req, res) => {
   const side = req.query.side;
-  res.json(side ? db.trades.filter((t) => t.side === side) : db.trades);
+  // Blotter shows LIVE trades only (cancelled ones stay in the DB for audit).
+  const q = `SELECT ${TRADE_COLS} FROM trades WHERE status = 'LIVE'` + (side ? ' AND side = ?' : '') + ' ORDER BY seq';
+  res.json(side ? sql.prepare(q).all(side) : sql.prepare(q).all());
 });
 app.post('/api/trades', (req, res) =>
   idempotent(req, res, () => {
@@ -113,7 +159,8 @@ app.post('/api/trades', (req, res) =>
     if (!Number.isFinite(price) || price <= 0) return { error: 'Price must be a positive number' };
     if (!Number.isFinite(quantity) || quantity <= 0) return { error: 'Quantity must be a positive number' };
     const t = { id: 'trd-' + id(), instrument: String(instrument).trim().toUpperCase(), side, price, quantity, notional: round2(price * quantity) };
-    db.trades.push(t);
+    sql.prepare('INSERT INTO trades (trade_id,instrument,side,price,quantity,notional,client,status,seq) VALUES (?,?,?,?,?,?,?,?,?)')
+      .run(t.id, t.instrument, side, price, quantity, t.notional, req.body.client || null, 'LIVE', ++seq);
     return t;
   })
 );
@@ -126,7 +173,7 @@ app.use('/static', express.static(path.join(__dirname, 'public')));
 const NAV = [
   ['QA Showcase', [['/', 'Overview', '◎']]],
   ['Gig Platform', [['/jobs', 'Jobs board', '▦'], ['/shifts/new', 'Create shift', '＋'], ['/payouts', 'Payouts', '₱']]],
-  ['Trading Desk', [['/trades', 'Trade booking', '⇅']]],
+  ['Trading Desk', [['/trades', 'Trade booking', '⇅'], ['/data-checks', 'Data checks (SQL)', '⌗']]],
 ];
 const head = (title) => `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>${title} · ShiftDesk QA Showcase</title><link rel="stylesheet" href="/static/styles.css"></head>`;
@@ -167,6 +214,7 @@ const COVERAGE = [
   ['Notional math', 'price × qty rounded to 2 dp, tricky decimals (0.1×0.2, 1.005×1000, 99.875×3)', 'tests/api/trades.api.spec.ts, tests/ui/trades.spec.ts'],
   ['Double-submit', 'Rapid double click books exactly one trade; same Idempotency-Key creates one record', 'tests/ui/trades.spec.ts, tests/api/trades.api.spec.ts'],
   ['Blotter', 'Row values == API values; buy/sell filter', 'tests/ui/trades.spec.ts'],
+  ['SQL data checks', 'Blotter == DB query; LEFT JOIN finds missing/failed settlements; console rejects non-SELECT', 'tests/ui/data-checks.spec.ts, tests/api/sql.api.spec.ts'],
   ['Performance', 'K6 smoke/load on /api/trades, p95 < 500 ms, errors < 1%', 'k6/load-trades.js'],
 ];
 app.get('/', guard, (_req, res) => res.send(page('/', 'QA Showcase', 'Playwright + TypeScript automation against a realistic gig platform and a trading desk.',
@@ -264,6 +312,31 @@ async function book(){const btn=$('[data-testid=trade-submit]');if(btn.disabled)
 const r=await post('/api/trades',{instrument:g('instrument'),side:g('side'),price:g('price'),quantity:g('quantity')},key);
 if(r.ok){key=crypto.randomUUID();load();const t=$('#toast');t.textContent='Booked '+r.body.side.toUpperCase()+' '+r.body.instrument+' · notional '+fmt(r.body.notional);setTimeout(()=>t.textContent='',2500);}else $('[data-testid=trade-error]').textContent=r.body.error;btn.disabled=false;}
 load();`)));
+
+const PRESETS = require('../sql/presets');
+app.get('/data-checks', guard, (_req, res) => res.send(page('/data-checks', 'Data checks (SQL)', 'Read-only SQL console on the live SQLite DB behind the blotter and payouts. SELECT only.',
+  `<div class="grid g4" style="margin-bottom:1rem">${PRESETS.map((p) => `<button type="button" class="card preset" data-testid="preset-${p.key}" data-key="${p.key}"><span class="badge blue">${p.ticket}</span><strong>${p.title}</strong><span class="sub">${p.why}</span></button>`).join('')}</div>
+<div class="grid" style="grid-template-columns:minmax(320px,1fr) minmax(260px,340px);align-items:start">
+<div class="card"><div class="row between" style="margin-bottom:.6rem"><h2 style="margin:0">Query</h2><span class="badge teal">read-only · SELECT only</span></div>
+<textarea data-testid="sql-editor" class="sqled" spellcheck="false" aria-label="SQL query"></textarea>
+<div class="row" style="margin-top:.8rem"><button class="btn" data-testid="sql-run" onclick="run()">Run query ▶</button><span class="sub" data-testid="sql-meta"></span></div>
+<p class="error" data-testid="sql-error" style="margin-top:.8rem"></p>
+<div class="tablewrap"><table data-testid="sql-results"><thead></thead><tbody><tr><td class="sub">Pick a check above or write a SELECT.</td></tr></tbody></table></div></div>
+<div class="card"><h2>Schema</h2><p class="sub" style="margin-bottom:.6rem">In-memory SQLite, seeded with demo defects.</p>
+<div class="schema"><div><span class="kbd">trades</span> trade_id, instrument, side, price, quantity, notional, client, status</div>
+<div><span class="kbd">settlements</span> settlement_id, trade_id, status, settled_on</div>
+<div><span class="kbd">payouts</span> payout_id, worker, shift_ref, base, allowance, special, amount</div></div>
+<h2 style="margin-top:1.2rem">Seeded defects</h2><ul class="sub defects"><li>QA-318: 2 trades never settled, 1 FAILED</li><li>QA-322: one shift paid twice</li><li>QA-327: cancelled trade in DB, not on blotter</li></ul>
+<button class="btn ghost" style="margin-top:.6rem" data-testid="sql-reseed" onclick="fetch('/api/reset?seed=demo',{method:'POST'}).then(()=>{$('[data-testid=sql-meta]').textContent='Demo data reloaded';})">Reload demo data</button></div></div>`,
+  `const P=${JSON.stringify(PRESETS).replace(/</g, '\\u003c')};
+$$('.preset').forEach(b=>b.onclick=()=>{$$('.preset').forEach(x=>x.classList.toggle('on',x===b));$('[data-testid=sql-editor]').value=P.find(p=>p.key===b.dataset.key).sql;run();});
+async function run(){$('[data-testid=sql-error]').textContent='';const t0=performance.now();
+const r=await post('/api/sql',{query:$('[data-testid=sql-editor]').value});
+if(!r.ok){$('[data-testid=sql-error]').textContent=r.body.error;$('[data-testid=sql-meta]').textContent='';return;}
+$('thead').innerHTML='<tr>'+r.body.columns.map(c=>'<th>'+esc(c)+'</th>').join('')+'</tr>';
+$('tbody').innerHTML=r.body.rows.map(row=>'<tr data-testid="sql-row">'+row.map(v=>v===null?'<td class="null">NULL</td>':'<td'+(typeof v==='number'?' class="num"':'')+'>'+esc(v)+'</td>').join('')+'</tr>').join('')||'<tr><td class="sub" colspan="'+r.body.columns.length+'">0 rows. No defects found.</td></tr>';
+$('[data-testid=sql-meta]').textContent=r.body.rows.length+' row(s) · '+Math.round(performance.now()-t0)+' ms';}
+$('[data-testid=sql-editor]').addEventListener('keydown',e=>{if((e.ctrlKey||e.metaKey)&&e.key==='Enter')run();});`)));
 
 if (require.main === module) app.listen(PORT, () => console.log(`ShiftDesk QA Showcase on http://localhost:${PORT}`));
 module.exports = app;

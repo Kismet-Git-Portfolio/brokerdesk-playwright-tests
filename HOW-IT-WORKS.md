@@ -76,3 +76,12 @@ So `test('x', async ({ loggedIn, tradesPage }) => ...)` means: reset data, log i
 3. **Make the network slower.** Change the 2000 ms delay in the slow-network test to 8000 and see it still pass with no extra sleeps. Then try 15000 and read the timeout error.
 4. **Add a validation rule.** Make the server reject quantities above 1,000,000, then add a UI test and an API test for it.
 5. **Debug visually.** Run `npx playwright test --ui` or `npx playwright test --headed --debug tests/ui/trades.spec.ts`, step through a test, and open a trace from the HTML report.
+
+## 9. SQL data checks
+
+- `app/server.js` creates an in-memory SQLite DB on start (`reset()` → `SCHEMA` → `seedDemo()`). `/api/trades` and `/api/payouts` read from and write to it, so the UI, API and DB always share one source of truth.
+- `POST /api/sql` is the read-only runner (`runReadOnly`). It rejects anything that isn't a single `SELECT`/`WITH` statement, and it relies on better-sqlite3's `stmt.readonly` flag instead of a fragile keyword list.
+- `sql/presets.js` holds the queries behind the preset buttons. `sql/data-checks.sql` has the same queries with comments telling each ticket story.
+- `pages/DataChecksPage.ts` is the page object. `table()` returns the result grid as arrays, so tests can do `expect(rows).toEqual([...])`.
+- Try this: in the console, run `SELECT * FROM settlements WHERE status = NULL` and then `... IS NULL`. The first returns 0 rows because NULL never equals anything.
+- Media: `npx playwright test -c scripts/sql-demo.config.ts` records the slow-mo walkthrough (set `MEDIA_DIR` for the screenshots).
