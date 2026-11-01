@@ -1,6 +1,4 @@
-// K6 smoke/load test for the trade booking API. Not run in CI.
-// Start the app first: npm start   Then: k6 run k6/load-trades.js
-// Smoke only: k6 run -e PROFILE=smoke k6/load-trades.js
+// not in CI. npm start, then: k6 run -e PROFILE=smoke k6/load-trades.js
 import http from 'k6/http';
 import { check, sleep } from 'k6';
 

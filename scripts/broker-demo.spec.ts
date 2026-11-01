@@ -1,4 +1,4 @@
-// The 2-minute interview demo, recorded in slow motion with screenshots (MEDIA_DIR=... to choose the output folder).
+// slow-mo demo run, MEDIA_DIR sets output folder
 import { test } from '@playwright/test';
 const OUT = process.env.MEDIA_DIR || 'media-results';
 const shot = (page: any, name: string) => page.screenshot({ path: `${OUT}/broker-${name}.png`, fullPage: true });

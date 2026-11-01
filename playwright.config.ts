@@ -5,7 +5,7 @@ const BASE_URL = process.env.BASE_URL || `http://localhost:${PORT}`;
 
 export default defineConfig({
   testDir: './tests',
-  // The mock app keeps data in memory, so run one worker to keep it predictable.
+  // in-memory DB, so one worker
   workers: 1,
   fullyParallel: false,
   retries: process.env.CI ? 1 : 0,
@@ -18,7 +18,6 @@ export default defineConfig({
     screenshot: 'only-on-failure',
   },
   projects: [{ name: 'chromium', use: { ...devices['Desktop Chrome'] } }],
-  // Starts the mock app before the tests and stops it afterwards.
   webServer: {
     command: 'node app/server.js',
     url: `${BASE_URL}/health`,
