@@ -8,7 +8,7 @@ test('create shift shows the correct gross total and appears in the list', async
   await shiftPage.fill(title, 'Pasig', { base: 750, allowance: 120.5, special: 49.25 });
   await expect(shiftPage.gross()).toHaveText('919.75');
   await shiftPage.publish();
-  await expect(shiftPage.toast()).toHaveText('New shift added!');
+  await expect(shiftPage.toast()).toHaveText('Shift added');
 
   const { shifts } = await (await api.get('/api/jobs')).json();
   const saved = shifts.find((s: any) => s.title === title);

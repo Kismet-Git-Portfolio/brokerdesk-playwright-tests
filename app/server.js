@@ -403,7 +403,7 @@ const guard = (req, res, next) => (authed(req) ? next() : res.redirect('/login')
 
 app.get('/login', (_req, res) => res.send(`${head('Sign in')}<body class="login"><div class="card">
 ${BRAND}
-<h1>Welcome back</h1><p class="sub" style="margin-bottom:1rem">Sign in to the demo broking desk.</p>
+<h1>Sign in</h1><p class="sub" style="margin-bottom:1rem">BrokerDesk practice app</p>
 <form data-testid="login-form" onsubmit="event.preventDefault();login()">
 <label class="f">Email <input data-testid="login-email" name="username" autocomplete="username" placeholder="demo.user@example.com"></label>
 <label class="f">Password <input data-testid="login-password" type="password" name="password" autocomplete="current-password"></label>
@@ -425,26 +425,26 @@ const COVERAGE = [
   ['Gig platform (prior work)', 'Login, shifts gross pay, 10-applicant batch, double-payout check, idempotent payouts, slow network', 'tests/ui/{auth,jobs,shifts,payouts}.spec.ts'],
   ['Performance', 'K6 smoke/load on /api/trades, p95 < 500 ms, errors < 1%', 'k6/load-trades.js'],
 ];
-app.get('/', guard, (_req, res) => res.send(page('/', 'Overview', 'A mock interdealer broking desk: rates, FX, credit, energy &amp; commodities, voice and electronic. Built to be tested.',
+app.get('/', guard, (_req, res) => res.send(page('/', 'Overview', 'Practice broking desk with rates, FX, credit and energy trades. Seeded with test data.',
   `<div class="grid g4" style="margin-bottom:1rem">
-<a class="card stat kpi" href="/blotter"><div class="label">Trades today</div><div class="value" data-testid="kpi-trades">–</div><div class="sub small">non-cancelled bookings</div></a>
-<a class="card stat kpi" href="/data-checks"><div class="label">Unsettled / failed</div><div class="value warn" data-testid="kpi-unsettled">–</div><div class="sub small">settlement breaks to chase</div></a>
-<a class="card stat kpi" href="/trades"><div class="label">Order rejects</div><div class="value bad" data-testid="kpi-rejects">–</div><div class="sub small">validation / tolerance / stale</div></a>
-<a class="card stat kpi" href="/fix"><div class="label">FIX messages</div><div class="value" data-testid="kpi-fix">–</div><div class="sub small"><span data-testid="kpi-stale">0</span> stale price(s)</div></a></div>
+<a class="card stat kpi" href="/blotter"><div class="label">Trades today</div><div class="value" data-testid="kpi-trades">0</div><div class="sub small">non-cancelled bookings</div></a>
+<a class="card stat kpi" href="/data-checks"><div class="label">Unsettled / failed</div><div class="value warn" data-testid="kpi-unsettled">0</div><div class="sub small">settlement breaks to chase</div></a>
+<a class="card stat kpi" href="/trades"><div class="label">Order rejects</div><div class="value bad" data-testid="kpi-rejects">0</div><div class="sub small">validation / tolerance / stale</div></a>
+<a class="card stat kpi" href="/fix"><div class="label">FIX messages</div><div class="value" data-testid="kpi-fix">0</div><div class="sub small"><span data-testid="kpi-stale">0</span> stale price(s)</div></a></div>
 <div class="grid" style="grid-template-columns:minmax(300px,1.1fr) minmax(300px,1fr);margin-bottom:1rem">
 <div class="card"><div class="row between"><h2 style="margin:0">Notional by asset class</h2><span class="badge teal">price × qty</span></div><div data-testid="notional-by-class" class="bars" style="margin-top:.8rem"></div></div>
 <div class="card"><div class="row between"><h2 style="margin:0">Market snapshot</h2><a href="/prices">Price board →</a></div><div class="ticker" data-testid="ticker" style="margin-top:.8rem"></div></div></div>
-<div class="hero"><span class="badge teal">Playwright + TypeScript · UI + API + SQL · CI on every push</span><h1 style="margin-top:.6rem">What this demo proves</h1>
-<p class="sub" style="max-width:820px">The risks a broker's QA team cares about: a duplicate trade, an order priced off a stale quote, a fat-finger price, a FIX message that disagrees with the booking, a trade that never settles. Each one has an automated test and a SQL check you can run live.</p></div>
+<div class="hero"><h1 style="margin-top:.6rem">What gets tested</h1>
+<p class="sub" style="max-width:820px">Duplicate trades, stale prices, fat-finger prices, FIX vs booking mismatches and unsettled trades. Each has a Playwright test and a SQL check.</p></div>
 <div class="card"><h2>Test coverage</h2><div class="tablewrap"><table data-testid="coverage-table"><thead><tr><th>Area</th><th>What's tested</th><th>Test file</th></tr></thead><tbody>
 ${COVERAGE.map(([f, w, t]) => `<tr><td><strong>${f}</strong></td><td>${w}</td><td><span class="kbd">${t}</span></td></tr>`).join('')}</tbody></table></div></div>`, '', 'overview.js')));
 
-app.get('/prices', guard, (_req, res) => res.send(page('/prices', 'Price board', `Simulated streaming quotes, refreshed every second. A quote older than ${STALE_MS / 1000}s is STALE and orders on it are blocked.`,
+app.get('/prices', guard, (_req, res) => res.send(page('/prices', 'Price board', `Fake quotes, update every 1s. Older than ${STALE_MS / 1000}s = STALE, orders blocked.`,
   `<div class="card"><div class="row between" style="margin-bottom:.8rem"><h2 style="margin:0">Live quotes</h2><span class="sub small" data-testid="board-clock"></span></div>
 <div class="tablewrap"><table data-testid="price-board"><thead><tr><th>Instrument</th><th>Asset class</th><th class="num">Bid</th><th class="num">Ask</th><th class="num">Spread</th><th>Last update</th><th>Status</th><th></th></tr></thead><tbody id="pb"></tbody></table></div>
-<p class="sub small" style="margin-top:.8rem">"Simulate outage" stops one feed so you can show the stale-price guard. Tests use the same hook: <span class="kbd">POST /api/prices/:symbol/freeze</span>.</p></div>`, '', 'prices.js')));
+<p class="sub small" style="margin-top:.8rem">"Simulate outage" stops one feed. API: <span class="kbd">POST /api/prices/:symbol/freeze</span></p></div>`, '', 'prices.js')));
 
-app.get('/trades', guard, (_req, res) => res.send(page('/trades', 'Order ticket (RFQ)', 'Price is checked against the live market tolerance band. Every order emits FIX 35=D + 35=8. Notional = price × quantity (2 dp).',
+app.get('/trades', guard, (_req, res) => res.send(page('/trades', 'Order ticket (RFQ)', 'Price must be within the tolerance band. Each order logs FIX 35=D and 35=8.',
   `<div class="grid" style="grid-template-columns:minmax(320px,400px) 1fr;align-items:start">
 <form class="card" data-testid="trade-form" onsubmit="event.preventDefault();book()" novalidate>
 <h2>New order</h2><label class="f">Instrument <input data-testid="trade-instrument" list="instruments" placeholder="EURUSD" autocomplete="off"></label>
@@ -458,7 +458,7 @@ app.get('/trades', guard, (_req, res) => res.send(page('/trades', 'Order ticket 
 <div class="grid g2" style="grid-template-columns:1fr 1fr;margin-top:.6rem"><label class="f">Client <select data-testid="trade-client"><option value="">Select client…</option>${CLIENTS.map((c) => `<option>${c}</option>`).join('')}</select></label>
 <label class="f">Counterparty <select data-testid="trade-counterparty"><option value="">Select…</option>${COUNTERPARTIES.map((c) => `<option>${c}</option>`).join('')}</select></label></div>
 <label class="f" style="margin-top:.6rem">Venue <select data-testid="trade-venue"><option>Electronic</option><option>Voice</option></select></label>
-<div class="total"><span>Notional</span><strong id="notional-preview">—</strong></div>
+<div class="total"><span>Notional</span><strong id="notional-preview">-</strong></div>
 <button class="btn" style="width:100%" data-testid="trade-submit">Submit order</button><p class="error" data-testid="trade-error" style="margin-top:.8rem"></p>
 <div class="confirm" data-testid="order-confirmation" hidden></div></form>
 <div class="card"><div class="row between" style="margin-bottom:.8rem"><h2 style="margin:0">Today's orders</h2>
@@ -469,7 +469,7 @@ app.get('/trades', guard, (_req, res) => res.send(page('/trades', 'Order ticket 
 
 const STATUSES = ['NEW', 'CONFIRMED', 'SETTLED', 'FAILED', 'CANCELLED'];
 const CLASSES = [...new Set(INSTRUMENTS.map((i) => i.asset_class))];
-app.get('/blotter', guard, (_req, res) => res.send(page('/blotter', 'Blotter', 'All bookings from the trades table. Cancelled trades stay in the DB for audit but are hidden unless you filter for them.',
+app.get('/blotter', guard, (_req, res) => res.send(page('/blotter', 'Blotter', 'Trades from the DB. Cancelled ones are hidden unless filtered.',
   `<div class="card"><div class="row between" style="margin-bottom:.8rem">
 <div class="chips" data-testid="asset-chips">${[['', 'All asset classes'], ...CLASSES.map((c) => [c, c])].map(([v, l]) => `<button type="button" class="chip${v === '' ? ' on' : ''}" data-ac="${v}">${l}</button>`).join('')}</div>
 <div class="row"><span class="mini"><select data-testid="blotter-asset" aria-label="Asset class"><option value="">All asset classes</option>${CLASSES.map((c) => `<option>${c}</option>`).join('')}</select></span>
@@ -479,18 +479,18 @@ app.get('/blotter', guard, (_req, res) => res.send(page('/blotter', 'Blotter', '
 
 app.get('/trades/:id', guard, (req, res) => res.send(page('/blotter', 'Trade ' + req.params.id.replace(/[^\w-]/g, ''), 'Lifecycle, audit trail and the FIX messages behind this booking.',
   `<div data-trade="${req.params.id.replace(/[^\w-]/g, '')}" id="trade-root"><div class="grid" style="grid-template-columns:minmax(320px,1fr) minmax(300px,380px);align-items:start">
-<div class="card"><div class="row between"><h2 style="margin:0" data-testid="trade-title">Loading…</h2><span class="badge" data-testid="trade-status">–</span></div>
+<div class="card"><div class="row between"><h2 style="margin:0" data-testid="trade-title">Loading</h2><span class="badge" data-testid="trade-status">–</span></div>
 <div class="stepper" data-testid="stepper" style="margin:1rem 0"></div><div class="kv" data-testid="trade-fields"></div>
 <div class="row" style="margin-top:1rem"><button class="btn" data-testid="action-confirm" data-act="confirm">Confirm</button><button class="btn" data-testid="action-settle" data-act="settle">Settle</button>
 <button class="btn ghost" data-testid="action-fail" data-act="fail">Mark settlement failed</button><button class="btn danger" data-testid="action-cancel" data-act="cancel">Cancel trade</button></div>
 <p class="error" data-testid="action-error" style="margin-top:.8rem"></p></div>
-<form class="card" data-testid="amend-form" onsubmit="event.preventDefault();amend()"><h2>Amend (NEW only)</h2><p class="sub small">Re-validated against the tolerance band. Sends FIX 35=G and 35=8 150=5.</p>
+<form class="card" data-testid="amend-form" onsubmit="event.preventDefault();amend()"><h2>Amend (NEW only)</h2><p class="sub small">Checked against tolerance again. Sends FIX 35=G, 35=8 150=5.</p>
 <div class="grid g2" style="grid-template-columns:1fr 1fr;margin-top:.6rem"><label class="f">Quantity <input data-testid="amend-qty"></label><label class="f">Price <input data-testid="amend-price"></label></div>
 <button class="btn" style="margin-top:.8rem;width:100%" data-testid="action-amend">Amend order</button></form></div>
 <div class="grid g2" style="margin-top:1rem;align-items:start"><div class="card"><h2>Audit trail</h2><ol class="audit" data-testid="audit"></ol></div>
 <div class="card"><div class="row between"><h2 style="margin:0">FIX messages</h2><a data-testid="open-fix-log" href="/fix?trade=${encodeURIComponent(req.params.id)}">Open in FIX log →</a></div><div data-testid="trade-fix" class="fixlist" style="margin-top:.8rem"></div></div></div></div>`, '', 'trade.js')));
 
-app.get('/fix', guard, (_req, res) => res.send(page('/fix', 'FIX message log', 'Simulated FIX 4.4 session BRKDESK ↔ counterparties. Click a message to parse it into tags. SOH shown as |.',
+app.get('/fix', guard, (_req, res) => res.send(page('/fix', 'FIX message log', 'Simulated FIX 4.4 messages. Click one to see the tags (SOH shown as |).',
   `<div class="grid" style="grid-template-columns:minmax(340px,1fr) minmax(320px,460px);align-items:start">
 <div class="card"><div class="row between" style="margin-bottom:.8rem"><h2 style="margin:0">Messages</h2><input data-testid="fix-filter" placeholder="Filter by trade ID…" style="max-width:220px"></div>
 <div class="tablewrap"><table data-testid="fix-table"><thead><tr><th>#</th><th>Time</th><th>Type</th><th>Trade</th><th>Summary</th></tr></thead><tbody id="fx"></tbody></table></div></div>
@@ -498,15 +498,15 @@ app.get('/fix', guard, (_req, res) => res.send(page('/fix', 'FIX message log', '
 <div class="tablewrap"><table data-testid="fix-tags"><thead><tr><th>Tag</th><th>Name</th><th>Value</th></tr></thead><tbody id="ft"></tbody></table></div></div></div>`, '', 'fix.js')));
 
 const PRESETS = require('../sql/presets');
-app.get('/data-checks', guard, (_req, res) => res.send(page('/data-checks', 'Data checks (SQL)', 'Read-only SQL console on the live SQLite DB behind the blotter, FIX log and settlements. SELECT only.',
+app.get('/data-checks', guard, (_req, res) => res.send(page('/data-checks', 'Data checks (SQL)', 'SQL console on the app DB. SELECT only.',
   `<div class="grid g4" style="margin-bottom:1rem">${PRESETS.map((p) => `<button type="button" class="card preset" data-testid="preset-${p.key}" data-key="${p.key}"><span class="badge ${p.gig ? 'blue' : 'teal'}">${p.ticket}</span><strong>${p.title}</strong><span class="sub">${p.why}</span></button>`).join('')}</div>
 <div class="grid" style="grid-template-columns:minmax(320px,1fr) minmax(260px,340px);align-items:start">
 <div class="card"><div class="row between" style="margin-bottom:.6rem"><h2 style="margin:0">Query</h2><span class="badge teal">read-only · SELECT only</span></div>
 <textarea data-testid="sql-editor" class="sqled" spellcheck="false" aria-label="SQL query"></textarea>
-<div class="row" style="margin-top:.8rem"><button class="btn" data-testid="sql-run" onclick="run()">Run query ▶</button><span class="sub" data-testid="sql-meta"></span></div>
+<div class="row" style="margin-top:.8rem"><button class="btn" data-testid="sql-run" onclick="run()">Run</button><span class="sub" data-testid="sql-meta"></span></div>
 <p class="error" data-testid="sql-error" style="margin-top:.8rem"></p>
 <div class="tablewrap"><table data-testid="sql-results"><thead id="sh"></thead><tbody id="sb"><tr><td class="sub">Pick a check above or write a SELECT.</td></tr></tbody></table></div></div>
-<div class="card"><h2>Schema</h2><p class="sub" style="margin-bottom:.6rem">In-memory SQLite, seeded with demo breaks.</p>
+<div class="card"><h2>Schema</h2><p class="sub" style="margin-bottom:.6rem">In-memory SQLite with seeded breaks.</p>
 <div class="schema"><div><span class="kbd">trades</span> trade_id, instrument, asset_class, side, price, quantity, notional, client, counterparty, venue, status, cl_ord_id, trade_date</div>
 <div><span class="kbd">settlements</span> settlement_id, trade_id, status, settled_on</div>
 <div><span class="kbd">fix_messages</span> fix_id, trade_id, msg_type, cl_ord_id, exec_type, ord_status, symbol, side, qty, price, raw</div>
@@ -527,30 +527,30 @@ $('[data-testid=sql-meta]').textContent=r.body.rows.length+' row(s) · '+Math.ro
 $('[data-testid=sql-editor]').addEventListener('keydown',e=>{if((e.ctrlKey||e.metaKey)&&e.key==='Enter')run();});`)));
 
 // Gig platform (prior work)
-app.get('/jobs', guard, (_req, res) => res.send(page('/jobs', 'Jobs and shifts', 'Open roles and published shifts. Data loads from /api/jobs.',
-  `<div data-testid="loading" class="grid g3" aria-busy="true"><span class="sub" style="grid-column:1/-1">Loading...</span><div class="sk" style="height:150px"></div><div class="sk" style="height:150px"></div><div class="sk" style="height:150px"></div></div>
+app.get('/jobs', guard, (_req, res) => res.send(page('/jobs', 'Jobs and shifts', 'Open jobs and shifts from /api/jobs.',
+  `<div data-testid="loading" class="grid g3" aria-busy="true"><span class="sub" style="grid-column:1/-1">Loading</span><div class="sk" style="height:150px"></div><div class="sk" style="height:150px"></div><div class="sk" style="height:150px"></div></div>
 <div data-testid="jobs-table" class="grid g3" hidden></div>`,
   `fetch('/api/jobs').then(r=>r.json()).then(d=>{const all=[...d.jobs,...d.shifts];
-$('[data-testid=jobs-table]').innerHTML=all.map(j=>'<div class="card jobcard" data-testid="job-row" data-id="'+esc(j.id)+'"><div class="row between"><span class="badge '+(j.type==='shift'?'teal':'blue')+'">'+j.type+'</span><span class="meta">'+esc(j.id)+'</span></div><h2 data-testid="job-title" style="margin:0">'+esc(j.title)+'</h2><div class="meta">📍 '+esc(j.location)+'</div>'+
-(j.gross!=null?'<div class="meta">Gross pay ₱ <strong data-testid="job-gross" style="color:var(--text)">'+money(j.gross)+'</strong></div>':'<div class="meta">Gross pay <span data-testid="job-gross"></span>—</div>')+
+$('[data-testid=jobs-table]').innerHTML=all.map(j=>'<div class="card jobcard" data-testid="job-row" data-id="'+esc(j.id)+'"><div class="row between"><span class="badge '+(j.type==='shift'?'teal':'blue')+'">'+j.type+'</span><span class="meta">'+esc(j.id)+'</span></div><h2 data-testid="job-title" style="margin:0">'+esc(j.title)+'</h2><div class="meta">'+esc(j.location)+'</div>'+
+(j.gross!=null?'<div class="meta">Gross pay ₱ <strong data-testid="job-gross" style="color:var(--text)">'+money(j.gross)+'</strong></div>':'<div class="meta">Gross pay <span data-testid="job-gross"></span>-</div>')+
 '<a class="btn" style="text-align:center;text-decoration:none;margin-top:.4rem" data-testid="job-open" href="/jobs/'+encodeURIComponent(j.id)+'">Open</a></div>').join('')||'<p class="sub">No listings yet.</p>';
 $('[data-testid=loading]').remove();$('[data-testid=jobs-table]').hidden=false;});`)));
 
-app.get('/shifts/new', guard, (_req, res) => res.send(page('/shifts/new', 'Create shift', 'Compensation is summed live; the backend must agree to the centavo.',
+app.get('/shifts/new', guard, (_req, res) => res.send(page('/shifts/new', 'Create shift', 'Gross pay = base + allowance + special.',
   `<div class="grid g2"><form class="card" data-testid="shift-form" onsubmit="event.preventDefault();save()">
 <div class="grid g2"><label class="f">Title <input data-testid="shift-title" placeholder="Night Shift"></label><label class="f">Location <input data-testid="shift-location" placeholder="Pasig"></label></div>
 <h2 style="margin-top:1rem">Compensation (₱)</h2><div class="grid g3"><label class="f">Base <input data-testid="shift-base" value="0" inputmode="decimal"></label><label class="f">Allowance <input data-testid="shift-allowance" value="0" inputmode="decimal"></label><label class="f">Special <input data-testid="shift-special" value="0" inputmode="decimal"></label></div>
 <div class="total"><span>Gross total</span><span>₱ <strong data-testid="shift-gross">0.00</strong></span></div>
 <button class="btn" data-testid="shift-submit">Publish shift</button><p class="error" data-testid="shift-error" style="margin-top:.8rem"></p></form>
-<div class="card"><h2>How it's tested</h2><p class="sub">The test types 750 + 120.50 + 49.25, expects <span class="kbd">919.75</span> on screen, publishes, then checks the API saved 919.75 and the jobs board shows the same.</p><p class="sub">Negative values are rejected server-side.</p></div></div>
+<div class="card"><h2>Test</h2><p class="sub">750 + 120.50 + 49.25 should show <span class="kbd">919.75</span> here, in the API and on the jobs board. Negatives are rejected.</p></div></div>
 <div class="toast" data-testid="toast"></div>`,
   `const v=(t)=>$('[data-testid=shift-'+t+']').value;
 function calc(){const g=['base','allowance','special'].reduce((s,k)=>s+(Number(v(k))||0),0);$('[data-testid=shift-gross]').textContent=money(g);}
 $$('input').forEach(i=>i.addEventListener('input',calc));
 async function save(){$('[data-testid=shift-error]').textContent='';const r=await post('/api/shifts',{title:v('title'),location:v('location'),base:v('base'),allowance:v('allowance'),special:v('special')});
-if(r.ok){$('[data-testid=toast]').textContent='New shift added!';$('[data-testid=toast]').dataset.id=r.body.id;}else $('[data-testid=shift-error]').textContent=r.body.error;}`)));
+if(r.ok){$('[data-testid=toast]').textContent='Shift added';$('[data-testid=toast]').dataset.id=r.body.id;}else $('[data-testid=shift-error]').textContent=r.body.error;}`)));
 
-app.get('/jobs/:id', guard, (req, res) => res.send(page('/jobs', 'Job details', 'Apply and see applicants in real time.',
+app.get('/jobs/:id', guard, (req, res) => res.send(page('/jobs', 'Job details', 'Apply and see the applicant list.',
   `<div class="grid g2"><form class="card" data-testid="apply-form" onsubmit="event.preventDefault();apply()">
 <div class="row between"><h2 style="margin:0">Apply</h2><span class="badge blue" data-testid="job-id">${req.params.id.replace(/[^\w-]/g, '')}</span></div>
 <div class="grid" style="margin-top:.8rem"><label class="f">Name <input data-testid="apply-name"></label><label class="f">Email <input data-testid="apply-email"></label>
@@ -559,9 +559,9 @@ app.get('/jobs/:id', guard, (req, res) => res.send(page('/jobs', 'Job details', 
   `const jid=$('[data-testid=job-id]').textContent;
 function load(){fetch('/api/jobs/'+jid+'/applicants').then(r=>r.json()).then(l=>{$('[data-testid=applicant-count]').textContent=l.length;$('[data-testid=applicants]').innerHTML=l.map(a=>'<li data-testid="applicant"><span class="avatar">'+esc(initials(a.name))+'</span><span><strong>'+esc(a.name)+'</strong><br><span class="sub">&lt;'+esc(a.email)+'&gt;</span></span></li>').join('')||'<li class="sub">No applicants yet.</li>';});}
 async function apply(){const r=await post('/api/jobs/'+jid+'/apply',{name:$('[data-testid=apply-name]').value,email:$('[data-testid=apply-email]').value});
-$('[data-testid=apply-status]').textContent=r.ok?'Application sent!':r.body.error;load();}load();`)));
+$('[data-testid=apply-status]').textContent=r.ok?'Application sent':r.body.error;load();}load();`)));
 
-app.get('/payouts', guard, (_req, res) => res.send(page('/payouts', 'Payouts', 'Every payout = base + allowance + special. Checked against the API and expected value.',
+app.get('/payouts', guard, (_req, res) => res.send(page('/payouts', 'Payouts', 'Payout = base + allowance + special.',
   `<div class="grid g4" style="margin-bottom:1rem"><div class="card stat"><div class="label">Total paid out</div><div class="value" id="s-total">₱ 0.00</div></div>
 <div class="card stat"><div class="label">Payouts</div><div class="value" id="s-count">0</div></div><div class="card stat"><div class="label">Average</div><div class="value" id="s-avg">₱ 0.00</div></div>
 <div class="card stat"><div class="label">Integrity check</div><div class="value"><span class="badge buy">UI = API</span></div></div></div>
@@ -569,10 +569,10 @@ app.get('/payouts', guard, (_req, res) => res.send(page('/payouts', 'Payouts', '
   `fetch('/api/payouts').then(r=>r.json()).then(l=>{const tot=l.reduce((s,p)=>s+p.amount,0);$('#s-total').textContent='₱ '+fmt(tot);$('#s-count').textContent=l.length;$('#s-avg').textContent='₱ '+fmt(l.length?tot/l.length:0);
 $('tbody').innerHTML=l.map(p=>'<tr data-testid="payout-row" data-id="'+esc(p.id)+'"><td><span class="kbd">'+esc(p.id)+'</span></td><td data-testid="payout-worker">'+esc(p.worker)+'</td><td class="num">'+money(p.base)+'</td><td class="num">'+money(p.allowance)+'</td><td class="num">'+money(p.special)+'</td><td class="num" data-testid="payout-amount">'+money(p.amount)+'</td><td><a href="/payouts/'+encodeURIComponent(p.id)+'">Statement</a></td></tr>').join('')||'<tr><td colspan="7" class="sub">No payouts yet.</td></tr>';});`)));
 
-app.get('/payouts/:id', guard, (req, res) => res.send(page('/payouts', 'Payout statement', 'PDF-style statement. The total here is what QA compares with the database.',
-  `<div class="statement" id="stmt"><p class="sub">Loading...</p></div><p style="margin-top:1rem"><a href="/payouts">← Back to payouts</a> · <a href="#" onclick="print();return false">Print / save as PDF</a></p>`,
+app.get('/payouts/:id', guard, (req, res) => res.send(page('/payouts', 'Payout statement', 'Printable statement. Total should match the DB.',
+  `<div class="statement" id="stmt"><p class="sub">Loading</p></div><p style="margin-top:1rem"><a href="/payouts">← Back to payouts</a> · <a href="#" onclick="print();return false">Print / save as PDF</a></p>`,
   `const pid=${JSON.stringify(req.params.id)};fetch('/api/payouts').then(r=>r.json()).then(l=>{const p=l.find(x=>x.id===pid);if(!p){$('#stmt').innerHTML='<p>Statement not found.</p>';return;}
-$('#stmt').innerHTML='<div style="display:flex;justify-content:space-between"><div><h3>Gig Platform</h3><div style="color:#6b7280">Payout statement</div></div><div style="text-align:right"><div><strong>'+esc(p.id)+'</strong></div><div style="color:#6b7280">'+new Date().toLocaleDateString()+'</div></div></div><hr style="margin:1.2rem 0;border:0;border-top:1px solid #e5e7eb"><p>Paid to: <strong>'+esc(p.worker)+'</strong></p><table><thead><tr><th>Component</th><th class="num">Amount (₱)</th></tr></thead><tbody><tr><td>Base pay</td><td class="num">'+fmt(p.base)+'</td></tr><tr><td>Allowance</td><td class="num">'+fmt(p.allowance)+'</td></tr><tr><td>Special pay</td><td class="num">'+fmt(p.special)+'</td></tr><tr class="tot"><td>Total payout</td><td class="num" data-testid="statement-total">'+fmt(p.amount)+'</td></tr></tbody></table><p style="color:#6b7280;font-size:.8rem;margin-top:1.2rem">Demo document. Total must equal the sum of components and the API record.</p>';});`)));
+$('#stmt').innerHTML='<div style="display:flex;justify-content:space-between"><div><h3>Gig platform</h3><div style="color:#6b7280">Payout statement</div></div><div style="text-align:right"><div><strong>'+esc(p.id)+'</strong></div><div style="color:#6b7280">'+new Date().toLocaleDateString()+'</div></div></div><hr style="margin:1.2rem 0;border:0;border-top:1px solid #e5e7eb"><p>Paid to: <strong>'+esc(p.worker)+'</strong></p><table><thead><tr><th>Component</th><th class="num">Amount (₱)</th></tr></thead><tbody><tr><td>Base pay</td><td class="num">'+fmt(p.base)+'</td></tr><tr><td>Allowance</td><td class="num">'+fmt(p.allowance)+'</td></tr><tr><td>Special pay</td><td class="num">'+fmt(p.special)+'</td></tr><tr class="tot"><td>Total payout</td><td class="num" data-testid="statement-total">'+fmt(p.amount)+'</td></tr></tbody></table><p style="color:#6b7280;font-size:.8rem;margin-top:1.2rem">Demo statement, not a real payslip.</p>';});`)));
 
 if (require.main === module) app.listen(PORT, () => console.log(`BrokerDesk on http://localhost:${PORT}`));
 module.exports = app;

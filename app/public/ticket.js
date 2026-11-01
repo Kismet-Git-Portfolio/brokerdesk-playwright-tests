@@ -21,7 +21,7 @@ async function refreshMarket() {
     (mkt.stale ? '<span class="badge sell" data-testid="ticket-stale">STALE</span>' : '<span class="badge buy">LIVE</span>') + '</div>' +
     '<div class="row between" style="margin-top:.3rem"><button type="button" class="q bid" data-testid="use-bid" data-px="' + mkt.bid + '">Bid ' + mkt.bid.toFixed(d) + '</button>' +
     '<button type="button" class="q ask" data-testid="use-ask" data-px="' + mkt.ask + '">Ask ' + mkt.ask.toFixed(d) + '</button></div>' +
-    '<div class="sub small" style="margin-top:.3rem">Tolerance ±' + mkt.tolerance_pct + '%: <span data-testid="tolerance-band">' + lo.toFixed(d) + ' – ' + hi.toFixed(d) + '</span></div>';
+    '<div class="sub small" style="margin-top:.3rem">Tolerance ±' + mkt.tolerance_pct + '%: <span data-testid="tolerance-band">' + lo.toFixed(d) + ' to ' + hi.toFixed(d) + '</span></div>';
   $$('.q').forEach((b) => b.onclick = () => { $('[data-testid=trade-price]').value = b.dataset.px; preview(); });
 }
 setInterval(() => { if (g('instrument').trim()) refreshMarket(); }, 2000);
@@ -33,7 +33,7 @@ function preview() {
   $('#h-price').textContent = warn; $('#h-qty').textContent = hq;
   $('[data-testid=trade-price]').classList.toggle('invalid', !!warn); $('[data-testid=trade-quantity]').classList.toggle('invalid', !!hq);
   const p = Number(g('price')), q = Number(g('quantity'));
-  $('#notional-preview').textContent = (!hp && !hq && g('price') && g('quantity')) ? fmt(Math.round((p * q + Number.EPSILON) * 100) / 100) : '—';
+  $('#notional-preview').textContent = (!hp && !hq && g('price') && g('quantity')) ? fmt(Math.round((p * q + Number.EPSILON) * 100) / 100) : '-';
 }
 ['price', 'quantity'].forEach((t) => $('[data-testid=trade-' + t + ']').addEventListener('input', preview));
 function syncChips() { $$('[data-f]').forEach((c) => c.classList.toggle('on', c.dataset.f === filt.value)); }
@@ -58,7 +58,7 @@ async function book() {
     key = crypto.randomUUID(); load();
     const t = r.body, c = $('[data-testid=order-confirmation]');
     c.hidden = false;
-    c.innerHTML = '<div class="row between"><strong>✓ Order accepted</strong><span class="badge st-' + t.status + '">' + t.status + '</span></div>' +
+    c.innerHTML = '<div class="row between"><strong>Order accepted</strong><span class="badge st-' + t.status + '">' + t.status + '</span></div>' +
       '<div class="kv small"><span>Trade ID</span><a data-testid="confirm-trade-id" href="/trades/' + encodeURIComponent(t.id) + '">' + esc(t.id) + '</a>' +
       '<span>ClOrdID (11)</span><span class="kbd" data-testid="confirm-clordid">' + esc(t.cl_ord_id) + '</span>' +
       '<span>Order</span><span>' + t.side.toUpperCase() + ' ' + t.quantity + ' ' + esc(t.instrument) + ' @ ' + t.price + '</span>' +

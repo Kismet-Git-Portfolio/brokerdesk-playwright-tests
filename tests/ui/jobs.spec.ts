@@ -15,7 +15,7 @@ test('apply to a job, and a second apply with the same email is blocked', async 
   await jobsPage.row('job-2').getByTestId('job-open').click();
   await expect(page).toHaveURL(/\/jobs\/job-2$/);
   await jobDetail.apply(a.name, a.email);
-  await expect(jobDetail.status()).toHaveText('Application sent!');
+  await expect(jobDetail.status()).toHaveText('Application sent');
   await expect(jobDetail.count()).toHaveText('1');
   await jobDetail.apply(a.name, a.email);
   await expect(jobDetail.status()).toHaveText('Already applied');

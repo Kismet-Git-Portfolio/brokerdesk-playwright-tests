@@ -11,8 +11,8 @@ async function load() {
   const steps = t.status === 'FAILED' || t.status === 'CANCELLED' ? ['NEW', 'CONFIRMED', t.status] : FLOW;
   const idx = steps.indexOf(t.status);
   $('[data-testid=stepper]').innerHTML = steps.map((s, i) => '<span class="step ' + (i < idx ? 'done' : i === idx ? 'cur st-' + s : '') + '">' + s + '</span>').join('<span class="arrow">→</span>');
-  $('[data-testid=trade-fields]').innerHTML = [['Trade ID', t.id], ['ClOrdID', t.cl_ord_id], ['Asset class', t.asset_class], ['Notional', fmt(t.notional)], ['Client', t.client || '—'],
-    ['Counterparty', t.counterparty || '—'], ['Venue', t.venue], ['Settlement', t.settlement ? t.settlement.status + (t.settlement.settled_on ? ' · ' + t.settlement.settled_on : '') : 'none']]
+  $('[data-testid=trade-fields]').innerHTML = [['Trade ID', t.id], ['ClOrdID', t.cl_ord_id], ['Asset class', t.asset_class], ['Notional', fmt(t.notional)], ['Client', t.client || '-'],
+    ['Counterparty', t.counterparty || '-'], ['Venue', t.venue], ['Settlement', t.settlement ? t.settlement.status + (t.settlement.settled_on ? ' · ' + t.settlement.settled_on : '') : 'none']]
     .map(([k, v]) => '<span>' + k + '</span><span data-testid="field-' + k.toLowerCase().replace(/\W+/g, '-') + '">' + esc(v) + '</span>').join('');
   $$('[data-act]').forEach((btn) => btn.disabled = !ALLOWED[btn.dataset.act].includes(t.status));
   $('[data-testid=action-amend]').disabled = t.status !== 'NEW';
