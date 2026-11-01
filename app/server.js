@@ -1,6 +1,4 @@
-// BrokerDesk QA Showcase: a self-contained mock interdealer-broker trading desk (plus a small gig-platform area from prior work).
-// Demo data only, no real systems. Trades, FIX messages, settlements, audit and payouts live in an in-memory SQLite DB
-// (better-sqlite3) so QA can verify them with SQL.
+// Mock broker desk for practising tests. Fake data, in-memory SQLite so I can check things with SQL.
 const express = require('express');
 const crypto = require('crypto');
 const path = require('path');
@@ -18,7 +16,7 @@ const round2 = (n) => Math.round((n + Number.EPSILON) * 100) / 100;
 const id = () => crypto.randomUUID().slice(0, 8);
 const today = () => new Date().toISOString().slice(0, 10);
 
-// ---------- reference data ----------
+// reference data
 // symbol, asset class, description, reference price, tolerance band %, display decimals, quoted spread
 const INSTRUMENTS = [
   ['EURUSD', 'FX', 'Euro / US Dollar spot', 1.0842, 1.0, 5, 0.0001],
@@ -34,12 +32,12 @@ const INST = Object.fromEntries(INSTRUMENTS.map((i) => [i.symbol, i]));
 const CLIENTS = ['Alpha Capital', 'Bravo Bank', 'Charlie Asset Mgmt', 'Delta Pension Fund', 'Echo Hedge Partners'];
 const COUNTERPARTIES = ['NORTHBANK', 'EASTSEC', 'WESTCAP', 'SOUTHMARKETS'];
 
-// ---------- simulated market data ----------
+// simulated market data
 let market = {};
 function resetMarket() {
   market = Object.fromEntries(INSTRUMENTS.map((i, k) => [i.symbol, { mid: i.ref_price, ts: Date.now(), frozen: false, phase: k * 1.7 }]));
 }
-// Ticks at most once a second: bounded random walk (±0.17%) around the reference, so it never leaves the tolerance band by itself.
+// small random walk around ref, max one tick per second
 function quote(sym) {
   const i = INST[sym], m = market[sym], now = Date.now();
   if (!m.frozen && now - m.ts >= 1000) {
@@ -51,7 +49,7 @@ function quote(sym) {
     tolerance_pct: i.tolerance_pct, ts: new Date(m.ts).toISOString(), age_ms: now - m.ts, stale: now - m.ts > STALE_MS };
 }
 
-// ---------- SQLite ----------
+// SQLite
 const SCHEMA = `
 CREATE TABLE instruments (symbol TEXT PRIMARY KEY, asset_class TEXT NOT NULL, ref_price REAL NOT NULL, tolerance_pct REAL NOT NULL);
 CREATE TABLE trades (trade_id TEXT PRIMARY KEY, instrument TEXT NOT NULL, asset_class TEXT NOT NULL, side TEXT NOT NULL CHECK (side IN ('buy','sell')),
@@ -69,7 +67,7 @@ CREATE INDEX idx_settlements_trade ON settlements(trade_id);
 CREATE INDEX idx_fix_trade ON fix_messages(trade_id);`;
 let sql, seq = 0, fixSeq = 0, db;
 
-// ---------- FIX 4.4 (simulated) ----------
+// FIX 4.4 (simulated)
 const SOH = '\x01';
 const fixTime = (d = new Date()) => d.toISOString().replace(/-/g, '').replace('T', '-').replace('Z', '');
 function buildFix(fields) {
@@ -167,7 +165,7 @@ reset(process.env.SEED !== '0'); // the app starts with demo data; tests reset t
 const TRADE_COLS = `trade_id AS id, instrument, asset_class, side, price, quantity, notional, client, counterparty, venue, status, cl_ord_id, booked_at`;
 const PAYOUT_COLS = 'payout_id AS id, worker, base, allowance, special, amount';
 
-// Read-only SQL runner for the Data Checks page: one SELECT/WITH statement, no writes, row cap.
+// one read-only SELECT/WITH, capped rows
 function runReadOnly(query) {
   const q = String(query || '').trim().replace(/;\s*$/, '');
   if (!q) return { error: 'Query is empty' };
@@ -181,7 +179,7 @@ function runReadOnly(query) {
   } catch (e) { return { error: 'SQL error: ' + e.message }; }
 }
 
-// ---------- helpers ----------
+// helpers
 const num = (v) => (typeof v === 'number' ? v : typeof v === 'string' && v.trim() !== '' ? Number(v) : NaN);
 function cookieToken(req) {
   const m = /(?:^|;\s*)session=([^;]+)/.exec(req.headers.cookie || '');
@@ -199,7 +197,7 @@ function idempotent(req, res, create) {
 const publicTrade = (t) => ({ id: t.trade_id, instrument: t.instrument, asset_class: t.asset_class, side: t.side, price: t.price, quantity: t.quantity,
   notional: t.notional, client: t.client, counterparty: t.counterparty, venue: t.venue, status: t.status, cl_ord_id: t.cl_ord_id, booked_at: t.booked_at });
 
-// Order validation. strict = RFQ ticket (client + counterparty required). Known instruments must be within the tolerance band of a fresh price.
+// strict = ticket (client + cpty required)
 function validateOrder(b, strict) {
   const instrument = String(b.instrument || '').trim().toUpperCase();
   const price = num(b.price), quantity = num(b.quantity);
@@ -264,7 +262,7 @@ function transition(tid, action, body = {}) {
   return publicTrade(getTrade(tid));
 }
 
-// ---------- API ----------
+// API
 app.get('/health', (_req, res) => res.json({ ok: true }));
 app.post('/api/reset', (req, res) => { reset(req.query.seed === 'demo' || (req.body || {}).seed === 'demo'); res.json({ ok: true }); });
 app.post('/api/sql', (req, res) => {
@@ -289,7 +287,7 @@ app.post('/api/logout', (req, res) => {
 app.get('/api/instruments', (_req, res) => res.json(INSTRUMENTS));
 app.get('/api/prices', (_req, res) => res.json(INSTRUMENTS.map((i) => quote(i.symbol))));
 app.get('/api/prices/:sym', (req, res) => (INST[req.params.sym] ? res.json(quote(req.params.sym)) : res.status(404).json({ error: 'Unknown instrument' })));
-// Demo/test hooks: simulate a feed outage for one instrument (price stops ticking and turns STALE) and recover it.
+// test hook: freeze a feed so it goes stale
 app.post('/api/prices/:sym/freeze', (req, res) => {
   const m = market[req.params.sym];
   if (!m) return res.status(404).json({ error: 'Unknown instrument' });
@@ -380,8 +378,7 @@ app.post('/api/payouts', (req, res) =>
   })
 );
 
-// ---------- UI ----------
-// Plain HTML + CSS + vanilla JS, no build step. Trading pages load their script from /static/*.js.
+// UI
 app.use('/static', express.static(path.join(__dirname, 'public')));
 const NAV = [
   ['Trading desk', [['/', 'Overview', '◎'], ['/prices', 'Price board', '≋'], ['/trades', 'Order ticket (RFQ)', '⇅'], ['/blotter', 'Blotter', '☰'],
@@ -389,13 +386,13 @@ const NAV = [
   ['Gig platform (prior work)', [['/jobs', 'Jobs board', '▦'], ['/shifts/new', 'Create shift', '＋'], ['/payouts', 'Payouts', '₱']]],
 ];
 const head = (title) => `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>${title} · BrokerDesk QA Showcase</title><link rel="stylesheet" href="/static/styles.css"></head>`;
+<title>${title} · BrokerDesk</title><link rel="stylesheet" href="/static/styles.css"></head>`;
 const helpers = `const $=(s)=>document.querySelector(s);const $$=(s)=>[...document.querySelectorAll(s)];
 const esc=(v)=>String(v).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 async function post(url,data,key){const h={'Content-Type':'application/json'};if(key)h['Idempotency-Key']=key;const r=await fetch(url,{method:'POST',headers:h,body:JSON.stringify(data)});return {ok:r.ok,body:await r.json()};}
 const money=(n)=>Number(n).toFixed(2);const fmt=(n)=>Number(n).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2});
 const initials=(n)=>String(n).split(/\\s+/).slice(0,2).map(w=>w[0]||'').join('').toUpperCase();`;
-const BRAND = `<div class="brand"><div class="logo">BD</div><div>BrokerDesk<small>QA Showcase</small></div></div>`;
+const BRAND = `<div class="brand"><div class="logo">BD</div><div>BrokerDesk<small>Practice desk</small></div></div>`;
 const page = (active, title, subtitle, body, script = '', src = '') => `${head(title)}<body><div class="shell">
 <aside class="side" data-testid="nav">${BRAND}
 ${NAV.map(([g, items]) => `<div class="navgroup">${g}</div>` + items.map(([href, label, ic]) => `<a href="${href}" class="${active === href ? 'active' : ''}"><span>${ic}</span>${label}</a>`).join('')).join('')}
@@ -529,7 +526,7 @@ $('#sb').innerHTML=r.body.rows.map(row=>'<tr data-testid="sql-row">'+row.map(v=>
 $('[data-testid=sql-meta]').textContent=r.body.rows.length+' row(s) · '+Math.round(performance.now()-t0)+' ms';}
 $('[data-testid=sql-editor]').addEventListener('keydown',e=>{if((e.ctrlKey||e.metaKey)&&e.key==='Enter')run();});`)));
 
-// ---------- Gig platform (prior work) ----------
+// Gig platform (prior work)
 app.get('/jobs', guard, (_req, res) => res.send(page('/jobs', 'Jobs and shifts', 'Open roles and published shifts. Data loads from /api/jobs.',
   `<div data-testid="loading" class="grid g3" aria-busy="true"><span class="sub" style="grid-column:1/-1">Loading...</span><div class="sk" style="height:150px"></div><div class="sk" style="height:150px"></div><div class="sk" style="height:150px"></div></div>
 <div data-testid="jobs-table" class="grid g3" hidden></div>`,
@@ -577,5 +574,5 @@ app.get('/payouts/:id', guard, (req, res) => res.send(page('/payouts', 'Payout s
   `const pid=${JSON.stringify(req.params.id)};fetch('/api/payouts').then(r=>r.json()).then(l=>{const p=l.find(x=>x.id===pid);if(!p){$('#stmt').innerHTML='<p>Statement not found.</p>';return;}
 $('#stmt').innerHTML='<div style="display:flex;justify-content:space-between"><div><h3>Gig Platform</h3><div style="color:#6b7280">Payout statement</div></div><div style="text-align:right"><div><strong>'+esc(p.id)+'</strong></div><div style="color:#6b7280">'+new Date().toLocaleDateString()+'</div></div></div><hr style="margin:1.2rem 0;border:0;border-top:1px solid #e5e7eb"><p>Paid to: <strong>'+esc(p.worker)+'</strong></p><table><thead><tr><th>Component</th><th class="num">Amount (₱)</th></tr></thead><tbody><tr><td>Base pay</td><td class="num">'+fmt(p.base)+'</td></tr><tr><td>Allowance</td><td class="num">'+fmt(p.allowance)+'</td></tr><tr><td>Special pay</td><td class="num">'+fmt(p.special)+'</td></tr><tr class="tot"><td>Total payout</td><td class="num" data-testid="statement-total">'+fmt(p.amount)+'</td></tr></tbody></table><p style="color:#6b7280;font-size:.8rem;margin-top:1.2rem">Demo document. Total must equal the sum of components and the API record.</p>';});`)));
 
-if (require.main === module) app.listen(PORT, () => console.log(`BrokerDesk QA Showcase on http://localhost:${PORT}`));
+if (require.main === module) app.listen(PORT, () => console.log(`BrokerDesk on http://localhost:${PORT}`));
 module.exports = app;
