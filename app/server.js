@@ -151,7 +151,7 @@ function seedDemo() {
 function reset(seed = false) {
   db = { sessions: db ? db.sessions : new Set(), jobs: [
       { id: 'job-1', title: 'Warehouse Picker', location: 'Makati', type: 'job' },
-      { id: 'job-2', title: 'Event Staff', location: 'Taguig', type: 'job' }], shifts: [], applicants: {}, idem: {} };
+      { id: 'job-2', title: 'Event Staff', location: 'Taguig', type: 'job' }], shifts: [], applicants: {}, idem: {}, drafts: {} };
   if (sql) sql.close();
   sql = new Database(':memory:');
   sql.exec(SCHEMA);
@@ -377,6 +377,37 @@ app.post('/api/payouts', (req, res) =>
     return p;
   })
 );
+
+// Drafts: a parked order ticket, not booked yet
+app.post('/api/drafts', (req, res) => {
+  const { instrument, side } = req.body || {};
+  const quantity = num((req.body || {}).quantity);
+  if (!INST[instrument]) return res.status(422).json({ code: 'VALIDATION', error: 'Unknown instrument' });
+  if (!Number.isFinite(quantity) || quantity <= 0) return res.status(422).json({ code: 'VALIDATION', error: 'Quantity must be a positive number' });
+  const d = { id: 'draft-' + id(), instrument, side: side === 'sell' ? 'sell' : 'buy', quantity };
+  db.drafts[d.id] = d;
+  res.status(201).json(d);
+});
+app.delete('/api/drafts/:id', (req, res) => {
+  if (!db.drafts[req.params.id]) return res.status(404).json({ error: 'Draft not found' });
+  delete db.drafts[req.params.id];
+  res.status(204).end();
+});
+
+// Admin: demo user is a trader, so this always gives 403 once signed in
+app.post('/api/admin/limits', (req, res) => {
+  if (!authed(req)) return res.status(401).json({ error: 'Sign in required' });
+  res.status(403).json({ error: 'Admin role required', role: 'trader' });
+});
+
+// test hook: forced server error so I can show what a 500 looks like
+app.get('/api/test/fault', (_req, _res) => { throw new Error('Injected fault'); });
+
+// bad JSON body gives 400 JSON, anything else thrown gives 500 JSON
+app.use('/api', (err, _req, res, _next) => {
+  if (err.type === 'entity.parse.failed') return res.status(400).json({ error: 'Malformed JSON' });
+  res.status(500).json({ error: 'Internal server error' });
+});
 
 // UI
 app.use('/static', express.static(path.join(__dirname, 'public')));

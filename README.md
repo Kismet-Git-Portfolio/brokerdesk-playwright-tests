@@ -15,7 +15,7 @@ Needs Node 22+.
 ```
 npm ci
 npx playwright install --with-deps chromium
-npx playwright test        # starts the app itself, 83 tests
+npx playwright test        # starts the app itself, 91 tests
 npx playwright show-report
 npm start                  # app on http://localhost:3100
 ```
@@ -31,6 +31,8 @@ Login: `demo.user@example.com` / `Demo#Pass123`
 - Blotter: filters match the API, cancelled trades hidden by default
 - SQL data checks (`sql/data-checks.sql`): missing/failed settlements (LEFT JOIN), duplicate bookings (GROUP BY ... HAVING), blotter vs DB reconciliation, FIX vs trades, prices outside tolerance. The SQL page is read-only.
 - Older gig-platform flows from my previous project (jobs, shifts, payouts)
+
+- API status codes: one test each for 201, 204, 400, 401, 403, 404, 422 and 500. I check the body too, not just the code. Table in API_STATUS_CODES.md
 
 UI tests are in `tests/ui`, API tests in `tests/api`, page objects in `pages/`. CI runs everything on each push.
 
